@@ -1,0 +1,1186 @@
+/* =========================================================================== */
+/* Custom CSS for Shiny Dashboard */
+/* =========================================================================== */
+
+/* Root variables for consistent spectral theming */
+:root {
+  /* Earth-tone inspired colors */
+  --primary-color: #8B4513;      /* Saddle brown */
+  --secondary-color: #6B5B73;    /* Muted purple-gray */
+  --success-color: #228B22;      /* Forest green */
+  --warning-color: #CD853F;      /* Peru */
+  --danger-color: #A0522D;       /* Sienna */
+  --info-color: #5F9EA0;         /* Cadet blue */
+  --light-color: #FAF7F0;
+  --dark-color: #2F2F2F;
+  
+  /* Additional earth colors */
+  --clay: #B87333;               /* Dark goldenrod */
+  --sand: #F4A460;               /* Sandy brown */
+  --stone: #708090;              /* Slate gray */
+  --moss: #9ACD32;               /* Yellow green */
+  --bark: #8B4513;               /* Saddle brown */
+  --soil: #654321;               /* Dark brown */
+  --rust: #B7410E;               /* Rust */
+  --sage: #87A96B;               /* Sage green */
+  --ochre: #CC7722;              /* Ochre */
+  --umber: #635147;              /* Umber */
+  --terra: #E2725B;              /* Terra cotta */
+  --olive: #808000;              /* Olive */
+  
+  /* Subtle earth gradients */
+  --earth-gradient: linear-gradient(135deg, 
+    rgba(139, 69, 19, 0.05) 0%,    /* Saddle brown */
+    rgba(160, 82, 45, 0.05) 20%,   /* Sienna */
+    rgba(205, 133, 63, 0.05) 40%,  /* Peru */
+    rgba(154, 205, 50, 0.05) 60%,  /* Yellow green */
+    rgba(244, 164, 96, 0.05) 80%,  /* Sandy brown */
+    rgba(210, 180, 140, 0.05) 100% /* Tan */
+  );
+  
+  --earth-gradient-vibrant: linear-gradient(135deg, 
+    rgba(139, 69, 19, 0.15) 0%,    /* Saddle brown */
+    rgba(160, 82, 45, 0.15) 20%,   /* Sienna */
+    rgba(205, 133, 63, 0.15) 40%,  /* Peru */
+    rgba(154, 205, 50, 0.15) 60%,  /* Yellow green */
+    rgba(244, 164, 96, 0.15) 80%,  /* Sandy brown */
+    rgba(210, 180, 140, 0.15) 100% /* Tan */
+  );
+  
+  --border-radius: 16px;
+  --box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  --box-shadow-earth: 0 4px 20px rgba(139, 69, 19, 0.1);
+  --transition: all 0.3s ease;
+}
+
+/* =========================================================================== */
+/* Layout and Structure */
+/* =========================================================================== */
+
+/* Body and main container with subtle spectral background */
+body {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.6;
+  color: #334155;
+  background: linear-gradient(135deg, 
+    #F8FAFC 0%, 
+    #F1F5F9 25%,
+    #E2E8F0 75%,
+    #CBD5E1 100%
+  );
+  background-attachment: fixed;
+}
+
+/* Main content area with earth overlay */
+#main_content {
+  min-height: 100vh;
+  background: var(--earth-gradient);
+  position: relative;
+}
+
+#main_content::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at center, 
+    rgba(124, 58, 237, 0.03) 0%,
+    rgba(59, 130, 246, 0.02) 20%,
+    rgba(20, 184, 166, 0.02) 40%,
+    rgba(16, 185, 129, 0.02) 60%,
+    rgba(251, 191, 36, 0.01) 80%,
+    transparent 100%
+  );
+  z-index: -1;
+  pointer-events: none;
+  animation: earth-pulse 8s ease-in-out infinite;
+}
+
+@keyframes earth-pulse {
+  0%, 100% {
+    background: radial-gradient(ellipse at center, 
+      rgba(139, 69, 19, 0.03) 0%,   /* Saddle brown */
+      rgba(160, 82, 45, 0.02) 20%,  /* Sienna */
+      rgba(205, 133, 63, 0.02) 40%, /* Peru */
+      rgba(154, 205, 50, 0.02) 60%, /* Yellow green */
+      rgba(244, 164, 96, 0.01) 80%, /* Sandy brown */
+      transparent 100%
+    );
+  }
+  50% {
+    background: radial-gradient(ellipse at center, 
+      rgba(160, 82, 45, 0.04) 0%,   /* Sienna */
+      rgba(205, 133, 63, 0.03) 20%, /* Peru */
+      rgba(154, 205, 50, 0.02) 40%, /* Yellow green */
+      rgba(244, 164, 96, 0.02) 60%, /* Sandy brown */
+      rgba(210, 180, 140, 0.01) 80%, /* Tan */
+      transparent 100%
+    );
+  }
+}
+
+/* Content sections */
+#home_content,
+#prediction_content {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================================== */
+/* Glassmorphism Banner Styling */
+/* =========================================================================== */
+
+/* Banner container with enhanced spectra background */
+.hero-banner {
+  position: relative;
+  height: 60vh;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: -1rem -15px 2rem -15px;
+  border-radius: 0 0 2rem 2rem;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+/* Background image as HTML element */
+.hero-bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  z-index: 0;
+  opacity: 0.9;
+  transition: all 0.5s ease;
+  animation: slowZoom 20s ease-in-out infinite;
+}
+
+/* Subtle zoom animation for the background */
+@keyframes slowZoom {
+  0%, 100% { 
+    transform: scale(1); 
+    opacity: 0.9; 
+  }
+  50% { 
+    transform: scale(1.05); 
+    opacity: 0.95; 
+  }
+}
+
+/* Create overlay as a pseudo-element for petri dish */
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(139, 0, 0, 0.12) 0%,      /* Subtle Dark Red overlay */
+    rgba(184, 134, 11, 0.08) 25%,   /* Golden overlay matching petri */
+    rgba(218, 165, 32, 0.05) 50%,   /* Goldenrod to match petri tones */
+    rgba(139, 69, 19, 0.06) 75%,    /* Saddle brown for warmth */
+    rgba(25, 25, 25, 0.3) 100%      /* Light dark background */
+  );
+  z-index: 1;
+}
+
+/* Glassmorphism overlay with golden petri tones */
+.glass-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(139, 0, 0, 0.05) 0%,      /* Very subtle Dark Red */
+    rgba(184, 134, 11, 0.06) 30%,   /* Golden tone matching petri */
+    rgba(218, 165, 32, 0.04) 60%,   /* Goldenrod for warmth */
+    rgba(160, 82, 45, 0.08) 100%    /* Saddle brown for depth */
+  );
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+/* Glass card in banner with golden petri accents */
+.glass-card {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(184, 134, 11, 0.06) 25%,   /* Golden tone from petri */
+    rgba(218, 165, 32, 0.05) 50%,   /* Goldenrod accent */
+    rgba(139, 0, 0, 0.04) 75%,      /* Subtle dark red */
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-top: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 16px;
+  padding: 3rem 2.5rem;
+  text-align: center;
+  box-shadow: 
+    0 8px 32px rgba(184, 134, 11, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  position: relative;
+  z-index: 3;
+  max-width: 600px;
+  margin: 0 1rem;
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Banner content styling with earth theme */
+.banner-title {
+  font-size: 6rem;
+  font-family: Roboto;
+  font-weight: 700;
+  background: linear-gradient(135deg, 
+    var(--clay) 0%,
+    var(--rust) 25%,
+    var(--ochre) 50%,
+    var(--sage) 75%,
+    #FFFFFF 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 
+    2px 2px 4px rgba(139, 69, 19, 0.3),
+    0 0 15px rgba(160, 82, 45, 0.4);
+  margin-bottom: 1rem;
+  line-height: 1.2;
+  filter: drop-shadow(0 0 10px rgba(139, 69, 19, 0.3));
+}
+
+.banner-subtitle {
+  font-size: 1.25rem;
+  font-family: Poppins;
+  color: rgba(0, 0, 0, 0.9);
+  margin-bottom: 2rem;
+  font-weight: 300;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.banner-cta {
+  background: linear-gradient(135deg, 
+    var(--primary-color) 0%,
+    var(--rust) 50%,
+    var(--clay) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  display: inline-block;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  box-shadow: 
+    0 4px 20px rgba(139, 69, 19, 0.3),
+    0 2px 10px rgba(160, 82, 45, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.banner-cta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: var(--earth-gradient-vibrant);
+  transition: left 0.5s ease;
+  z-index: -1;
+}
+
+.banner-cta:hover {
+  transform: translateY(-3px) scale(1.08);
+  background: linear-gradient(135deg, 
+    var(--rust) 0%,
+    var(--ochre) 50%,
+    var(--sage) 100%
+  );
+  box-shadow: 
+    0 8px 35px rgba(139, 69, 19, 0.4),
+    0 4px 20px rgba(160, 82, 45, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.banner-cta:hover::before {
+  left: 0;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Spectral particles effect */
+.spectral-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: radial-gradient(circle, 
+    var(--clay) 0%,
+    var(--rust) 30%,
+    var(--ochre) 60%,
+    transparent 100%
+  );
+  border-radius: 50%;
+  animation: earth-drift 12s infinite linear;
+  opacity: 0.6;
+}
+
+.particle:nth-child(2n) {
+  background: radial-gradient(circle, 
+    var(--sage) 0%,
+    var(--moss) 30%,
+    var(--sand) 60%,
+    transparent 100%
+  );
+  animation-duration: 15s;
+  animation-delay: -3s;
+}
+
+.particle:nth-child(3n) {
+  background: radial-gradient(circle, 
+    var(--stone) 0%,
+    var(--umber) 30%,
+    var(--terra) 60%,
+    transparent 100%
+  );
+  animation-duration: 10s;
+  animation-delay: -6s;
+}
+
+@keyframes earth-drift {
+  0% {
+    transform: translateY(100vh) translateX(-50px) scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+    transform: scale(1) rotate(45deg);
+  }
+  90% {
+    opacity: 0.7;
+    transform: scale(1.2) rotate(315deg);
+  }
+  100% {
+    transform: translateY(-10vh) translateX(150px) scale(0) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* Responsive banner */
+@media (max-width: 768px) {
+  .hero-banner {
+    height: 25vh;
+    min-height: 200px;
+  }
+  
+  .banner-title {
+    font-size: 2.5rem;
+  }
+  
+  .banner-subtitle {
+    font-size: 1.1rem;
+  }
+  
+  .glass-card {
+    padding: 2rem 1.5rem;
+    margin: 0 0.5rem;
+    border-radius: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .banner-title {
+    font-size: 2rem;
+  }
+  
+  .banner-subtitle {
+    font-size: 1rem;
+  }
+}
+
+/* =========================================================================== */
+/* Spectral Cards Styling */
+/* =========================================================================== */
+
+/* Enhanced earth-themed cards */
+.spectral-card {
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(250, 247, 240, 0.95) 100%
+  );
+  border: 1px solid rgba(139, 69, 19, 0.12);
+  border-radius: 16px;
+  box-shadow: var(--box-shadow-earth);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.spectral-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, 
+    var(--soil) 0%,
+    var(--rust) 16.67%,
+    var(--clay) 33.33%,
+    var(--ochre) 50%,
+    var(--sage) 66.67%,
+    var(--moss) 83.33%,
+    var(--sand) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.spectral-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 12px 40px rgba(139, 69, 19, 0.15),
+    0 4px 12px rgba(160, 82, 45, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.spectral-card:hover::before {
+  opacity: 1;
+}
+
+/* Earth-themed card headers */
+.spectral-card .card-header.bg-gradient {
+  background: linear-gradient(135deg, 
+    var(--primary-color) 0%,
+    var(--rust) 50%,
+    var(--clay) 100%
+  ) !important;
+  border: none;
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+  color: white !important;
+  font-family: Poppins;
+  border-radius: 16px 16px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.spectral-card .card-header.bg-gradient::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+}
+
+.spectral-card:hover .card-header.bg-gradient::after {
+  left: 100%;
+}
+
+/* Card body enhancements */
+.spectral-card .card-body {
+  padding: 1.5rem;
+  position: relative;
+}
+
+/* Badge styling for earth theme */
+.badge.bg-primary {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--clay) 100%) !important;
+  color: white !important;
+}
+
+.badge.bg-warning {
+  background: linear-gradient(135deg, var(--warning-color) 0%, var(--ochre) 100%) !important;
+  color: white !important;
+}
+
+.badge.bg-success {
+  background: linear-gradient(135deg, var(--success-color) 0%, var(--sage) 100%) !important;
+  color: white !important;
+}
+
+.badge.bg-info {
+  background: linear-gradient(135deg, var(--info-color) 0%, var(--stone) 100%) !important;
+  color: white !important;
+}
+
+.badge.bg-secondary {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, var(--umber) 100%) !important;
+  color: white !important;
+}
+
+/* Subtle glow effect for interactive elements */
+.spectral-card .badge:hover {
+  box-shadow: 0 0 15px rgba(139, 69, 19, 0.4);
+  transform: scale(1.08) translateY(-1px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Lead text styling */
+.spectral-card .lead {
+  color: #495057;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+/* =========================================================================== */
+/* Router Navigation Styling */
+/* =========================================================================== */
+
+/* Navigation bar enhancements - Earth Theme */
+.navbar {
+  background: linear-gradient(135deg, 
+    rgba(139, 69, 19, 0.95) 0%,    /* Saddle brown */
+    rgba(160, 82, 45, 0.95) 25%,   /* Sienna */
+    rgba(205, 133, 63, 0.95) 50%,  /* Peru */
+    rgba(139, 69, 19, 0.95) 100%   /* Saddle brown */
+  ) !important;
+  box-shadow: 
+    0 4px 20px rgba(139, 69, 19, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  border: none;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  font-size: 1.5rem;
+  transition: var(--transition);
+  color: rgba(255, 255, 255, 0.95) !important;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-brand:hover {
+  transform: scale(1.05);
+  color: white !important;
+  text-shadow: 2px 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+/* Navigation links - Spectral Theme */
+.navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-weight: 500;
+  margin-right: 1rem;
+  padding: 0.5rem 1rem !important;
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  text-decoration: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.navbar-nav .nav-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    rgba(139, 69, 19, 0.3) 0%,
+    rgba(205, 133, 63, 0.3) 50%,
+    rgba(154, 205, 50, 0.3) 100%
+  );
+  transition: left 0.3s ease;
+  z-index: -1;
+}
+
+.navbar-nav .nav-link:hover {
+  color: white !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(139, 69, 19, 0.3);
+}
+
+.navbar-nav .nav-link:hover::before {
+  left: 0;
+}
+
+.navbar-nav .nav-link.active {
+  color: white !important;
+  background: linear-gradient(135deg, 
+    rgba(139, 69, 19, 0.4) 0%,
+    rgba(205, 133, 63, 0.4) 100%
+  );
+  font-weight: 600;
+  box-shadow: 
+    0 2px 10px rgba(139, 69, 19, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Router page transitions */
+.router-page {
+  animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateX(30px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateX(0);
+  }
+}
+
+/* =========================================================================== */
+/* Sidebar Styling */
+/* =========================================================================== */
+
+/* Sidebar enhancements */
+.bslib-sidebar {
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+  border-right: 1px solid #e9ecef;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+}
+
+.sidebar-heading {
+  color: var(--primary-color);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.875rem;
+}
+
+/* Navigation buttons */
+.btn-outline-primary {
+  border: 2px solid var(--primary-color);
+  transition: var(--transition);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  transform: translateX(5px);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--clay) 100%);
+  border: none;
+  box-shadow: var(--box-shadow-earth);
+  color: white;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+}
+
+.btn-primary:hover::before {
+  left: 100%;
+}
+
+/* =========================================================================== */
+/* Card Components */
+/* =========================================================================== */
+
+.card {
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--clay) 100%);
+  color: white;
+  font-weight: 600;
+  border-bottom: none;
+  padding: 1rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+}
+
+.card:hover .card-header::after {
+  left: 100%;
+}
+
+.card-body {
+  padding: 1.5rem;
+  background: white;
+}
+
+/* Status badges */
+.badge {
+  padding: 0.5em 0.75em;
+  border-radius: 30px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.badge.bg-success {
+  background: linear-gradient(135deg, var(--success-color) 0%, #1e7e34 100%) !important;
+}
+
+.badge.bg-secondary {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #545b62 100%) !important;
+}
+
+/* =========================================================================== */
+/* Form Elements */
+/* =========================================================================== */
+
+/* Input styling */
+.form-control,
+.form-select {
+  border: 2px solid #e9ecef;
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+  padding: 0.75rem 1rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Button enhancements */
+.btn {
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  transition: var(--transition);
+  padding: 0.75rem 1.5rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #0056b3 100%);
+  border: none;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  background: linear-gradient(135deg, var(--rust) 0%, var(--ochre) 100%);
+  box-shadow: 
+    0 8px 25px rgba(139, 69, 19, 0.25),
+    0 4px 12px rgba(160, 82, 45, 0.15);
+  color: white;
+}
+
+/* =========================================================================== */
+/* Output Elements */
+/* =========================================================================== */
+
+/* Verbatim text output */
+.shiny-text-output {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9rem;
+  color: #495057;
+  line-height: 1.5;
+}
+
+/* Plot output container */
+.shiny-plot-output {
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--box-shadow);
+}
+
+/* =========================================================================== */
+/* Responsive Design */
+/* =========================================================================== */
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100% !important;
+  }
+  
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* =========================================================================== */
+/* Loading Animations */
+/* =========================================================================== */
+
+/* Enhanced loading spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(0,123,255,.3);
+  border-radius: 50%;
+  border-top-color: var(--primary-color);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Enhanced prediction progress indicators */
+.prediction-progress-container {
+  transition: all 0.3s ease;
+}
+
+/* Enhanced spinner with glow effect */
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+.spinner-grow-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Enhanced prediction button states */
+.btn-predicting {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-predicting::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+/* Progress bar enhancements */
+.progress {
+  background-color: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.progress-bar {
+  transition: width 0.6s ease;
+  background: linear-gradient(45deg, 
+    #28a745 25%, 
+    transparent 25%, 
+    transparent 50%, 
+    #28a745 50%, 
+    #28a745 75%, 
+    transparent 75%, 
+    transparent
+  );
+  background-size: 20px 20px;
+  animation: progress-animation 1s linear infinite;
+}
+
+@keyframes progress-animation {
+  0% { background-position: 0 0; }
+  100% { background-position: 20px 0; }
+}
+
+/* Spectral analysis spinner with color transitions */
+.spectral-spinner {
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  border-top: 2px solid #28a745;
+  border-right: 2px solid #ffc107;
+  border-bottom: 2px solid #dc3545;
+  border-left: 2px solid #007bff;
+  animation: spectral-spin 1.5s linear infinite;
+}
+
+@keyframes spectral-spin {
+  0% {
+    transform: rotate(0deg);
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+    filter: hue-rotate(360deg);
+  }
+}
+
+/* Prediction status text animations */
+.prediction-status {
+  font-weight: 500;
+  color: #28a745;
+  animation: fade-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fade-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Enhanced success notification styling */
+.prediction-success {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border: 1px solid #28a745;
+  color: #155724;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+/* Pulse effect for active elements */
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Processing button overlay */
+.btn-processing {
+  position: relative;
+  pointer-events: none;
+}
+
+.btn-processing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0.1) 0%, 
+    rgba(255,255,255,0.3) 50%, 
+    rgba(255,255,255,0.1) 100%
+  );
+  animation: processing-sweep 2s ease-in-out infinite;
+  border-radius: inherit;
+}
+
+@keyframes processing-sweep {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+/* =========================================================================== */
+/* Spectral Enhancement Effects */
+/* =========================================================================== */
+
+/* Subtle spectral glow for focus states */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 
+    0 0 0 0.2rem rgba(139, 69, 19, 0.25),
+    0 0 10px rgba(139, 69, 19, 0.1);
+  outline: none;
+}
+
+/* Enhanced interactive elements */
+.interactive-element {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-element:hover {
+  box-shadow: 
+    0 4px 20px rgba(139, 69, 19, 0.15),
+    0 2px 8px rgba(160, 82, 45, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Earth border animation */
+@keyframes border-flow {
+  0%, 100% { border-color: var(--soil); }
+  16.67% { border-color: var(--rust); }
+  33.33% { border-color: var(--clay); }
+  50% { border-color: var(--ochre); }
+  66.67% { border-color: var(--sage); }
+  83.33% { border-color: var(--moss); }
+}
+
+.border-earth-flow {
+  border: 2px solid var(--soil);
+  animation: border-flow 3s ease-in-out infinite;
+}
+
+/* =========================================================================== */
+/* Utility Classes */
+/* =========================================================================== */
+
+/* Text utilities */
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--clay) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-earth {
+  background: var(--earth-gradient-vibrant);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: earth-flow 4s ease-in-out infinite;
+}
+
+@keyframes earth-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Spacing utilities */
+.mt-4 { margin-top: 2rem !important; }
+.mb-4 { margin-bottom: 2rem !important; }
+.p-3 { padding: 1.5rem !important; }
+
+/* Border utilities */
+.border-primary { border-color: var(--primary-color) !important; }
+.rounded-lg { border-radius: var(--border-radius) !important; }
+
+/* =========================================================================== */
+/* Dark mode support (optional) */
+/* =========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --light-color: #343a40;
+    --dark-color: #f8f9fa;
+  }
+  
+  body {
+    background-color: #1a1a1a;
+    color: #f8f9fa;
+  }
+  
+  .card {
+    background-color: #2d2d2d;
+    color: #f8f9fa;
+  }
+  
+  .card-body {
+    background-color: #2d2d2d;
+  }
+}
+
+.pagination {
+  --bs-pagination-padding-x: .75rem;
+  --bs-pagination-padding-y: .375rem;
+  --bs-pagination-font-size: 1rem;
+  --bs-pagination-color: #fff;
+  --bs-pagination-bg: #000000;
+  --bs-pagination-border-width: 0;
+  --bs-pagination-border-color: rgba(0, 0, 0, 0);
+  --bs-pagination-border-radius: var(--bs-border-radius);
+  --bs-pagination-hover-color: #fff;
+  --bs-pagination-hover-bg: #003d32;
+  --bs-pagination-hover-border-color: rgba(0, 0, 0, 0);
+  --bs-pagination-focus-color: var(--bs-link-hover-color);
+  --bs-pagination-focus-bg: var(--bs-secondary-bg);
+  --bs-pagination-focus-box-shadow: 0 0 0 .25rem rgba(0, 123, 255, 0.25);
+  --bs-pagination-active-color: #fff;
+  --bs-pagination-active-bg: #052620;
+  --bs-pagination-active-border-color: rgba(0, 0, 0, 0);
+  --bs-pagination-disabled-color: #ecf0f1;
+  --bs-pagination-disabled-bg: #e6993b;
+  --bs-pagination-disabled-border-color: rgba(0, 0, 0, 0);
+  display: flex;
+  display: -webkit-flex;
+  padding-left: 0;
+  list-style: none;
+}
