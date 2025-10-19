@@ -16,6 +16,13 @@ library(mirai)
 source("modules/home_module.R")
 source("modules/prediction_module.R")
 
+# Set maximum upload size to 50 MB
+options(shiny.maxRequestSize = 50 * 1024^2)
+# Mirai daemons
+daemons(n = 2L, dispatcher = TRUE)
+# Processing and prediction function
+source("src/spectra_process_predict.R")
+
 # Source prediction processing function
 source("src/spectra_process_predict.R")
 ##

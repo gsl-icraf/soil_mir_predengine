@@ -29,13 +29,6 @@ SUCCESS_COLOR <- "#28a745"
 # Utility Functions
 # =============================================================================
 
-# Set maximum upload size to 50 MB
-options(shiny.maxRequestSize = 50 * 1024^2)
-# Mirai daemons
-daemons(n = 2L, dispatcher = TRUE)
-# Processing and prediction function
-source("src/spectra_process_predict.R")
-
 #' Create a standardized info box
 #' @param title Character, the title of the info box
 #' @param value Character or numeric, the value to display

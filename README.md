@@ -63,5 +63,4 @@ soil_mir_predengine/
 
 ```r
 source("run_app.R")
-shiny::runApp()
 ```
