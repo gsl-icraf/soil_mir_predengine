@@ -615,6 +615,7 @@ prediction_server <- function(id) {
 
             # Add vertical line for mean
             abline(v = mean(prop_values), col = "red", lwd = 2, lty = 2)
+            abline(v = median(prop_values), col = "blue", lwd = 2, lty = 2)
 
             # Add vertical line for selected row value
             if (!is.null(selected_values) && prop_name %in% colnames(selected_values)) {
@@ -631,8 +632,9 @@ prediction_server <- function(id) {
 
             # Add text showing mean and sd
             mean_val <- round(mean(prop_values), 2)
+            median_val <- round(median(prop_values), 2)
             sd_val <- round(sd(prop_values), 2)
-            legend_text <- paste0("Mean: ", mean_val, "\nSD: ", sd_val)
+            legend_text <- paste0("Mean: ", mean_val, "\nMedian: ", median_val, "\nSD: ", sd_val)
 
             # Add selected value to legend if available
             if (!is.null(selected_values) && prop_name %in% colnames(selected_values)) {

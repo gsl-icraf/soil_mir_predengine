@@ -30,7 +30,8 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         if (!file.exists(paste0("models/", soilvar, "_model_ranger_rf.rds"))) {
             stop(paste("Model file for", soilvar, "not found. Please ensure the model exists in the 'models' directory."))
         }
-        rf_mod <- readRDS(paste0("models/", soilvar, "_model_ranger_rf.rds"))
+        #rf_mod <- readRDS(paste0("models/", soilvar, "_model_ranger_rf.rds"))
+        rf_mod <- qs::qread(paste0("models/", soilvar, "_model_ranger_rf.qs"))
         predictions <- round(ranger:::predict.ranger(rf_mod, data = resampled_spectra)$predictions, 2)
         results_df[[soilvar]] <- predictions
     }

@@ -17,7 +17,8 @@ required_packages <- c(
   "DT", # Interactive data tables
   "plotly", # Interactive plots
   "data.table", # Fast data processing
-  "stringr"
+  "stringr",
+  "qs" # Fast serialization
 )
 
 packages_from_r_universe <- c(
