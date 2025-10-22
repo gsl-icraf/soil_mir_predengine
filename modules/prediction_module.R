@@ -19,7 +19,7 @@ prediction_ui <- function(id) {
         card_body(
           layout_columns(
             col_widths = c(4, 8),
-            
+
             # Left side - file upload and controls
             div(
               fileInput(
@@ -35,17 +35,24 @@ prediction_ui <- function(id) {
                 )
               ),
               helpText("Upload a ZIP file containing soil spectral data for prediction."),
-              # Spectra count display
-              div(
-                class = "mb-3 p-2 rounded",
-                style = "background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);",
+              # Show unzip button and spectra count after file upload
+              conditionalPanel(
+                condition = "output.file_uploaded == true",
+                ns = ns,
                 div(
-                  class = "d-flex justify-content-between align-items-center",
-                  span("Spectra Processed:", style = "color: white; font-weight: 500;"),
-                  uiOutput(ns("spectra_count_display"), style = "color: #00ff88; font-weight: bold; font-size: 1.1em;")
+                  class = "d-flex align-items-center gap-3",
+                  actionButton(ns("unzip_btn"), "Unzip Spectra", class = "btn-xs btn-outline-light"),
+                  div(
+                    class = "p-2 rounded flex-grow-1",
+                    style = "background-color: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);",
+                    div(
+                      class = "d-flex justify-content-between align-items-center",
+                      span("Spectra Processed:", style = "color: white; font-weight: 500;"),
+                      uiOutput(ns("spectra_count_display"), style = "color: #00ff88; font-weight: bold; font-size: 1.1em;")
+                    )
+                  )
                 )
               ),
-              actionButton(ns("unzip_btn"), "Unzip Spectra", class = "btn-xs btn-outline-light"),
 
               # Helpful message before unzipping
               conditionalPanel(
@@ -94,12 +101,15 @@ prediction_ui <- function(id) {
                       label = list(icon("download"), " Download Results (CSV)"),
                       class = "btn-outline-success btn-sm",
                       style = "width: 100%;"
+                    ),
+                    p("Downloading the results will reset the app for new predictions.",
+                      style = "font-size: 0.8em; color: #6c757d; margin-top: 4px;"
                     )
                   )
                 )
               )
             ),
-            
+
             # Right side - spectral plot
             div(
               div(
@@ -253,7 +263,7 @@ prediction_server <- function(id) {
 
     spectral_df_long <- spectral_df_long[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
     spectral_df_long[, wavelength := as.numeric(as.character(wavelength))]
-    spectral_df_long <- spectral_df_long[wavelength >= 599 & wavelength <= 3997, ]
+    spectral_df_long <- spectral_df_long[wavelength >= 617 & wavelength <= 3991, ]
     spectral_df_long <- spectral_df_long[order(SSN, wavelength)]
 
     spectral_df_sg_long <- melt.data.table(
@@ -265,34 +275,37 @@ prediction_server <- function(id) {
 
     spectral_df_sg_long <- spectral_df_sg_long[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
     spectral_df_sg_long[, wavelength := as.numeric(as.character(wavelength))]
-    spectral_df_sg_long <- spectral_df_sg_long[wavelength >= 599 & wavelength <= 3997, ]
+    spectral_df_sg_long <- spectral_df_sg_long[wavelength >= 617 & wavelength <= 3991, ]
     spectral_df_sg_long <- spectral_df_sg_long[order(SSN, wavelength)]
+
 
     # Reactive value for derivative toggle
     show_derivative <- reactiveVal(FALSE)
-    
+
     # Toggle derivative button handler
     observeEvent(input$toggle_derivative, {
       current_state <- show_derivative()
       show_derivative(!current_state)
-      
+
       # Update button text
       if (!current_state) {
-        updateActionButton(session, "toggle_derivative", 
-                          label = "Show Original Spectra", 
-                          icon = icon("arrow-left"))
+        updateActionButton(session, "toggle_derivative",
+          label = "Show Original Spectra",
+          icon = icon("arrow-left")
+        )
       } else {
-        updateActionButton(session, "toggle_derivative", 
-                          label = "Show First Derivatives", 
-                          icon = icon("arrow-right"))
+        updateActionButton(session, "toggle_derivative",
+          label = "Show First Derivatives",
+          icon = icon("arrow-right")
+        )
       }
     })
-    
+
     ### Render combined plot
     output$spectral_plot_combined <- renderPlotly({
       # Determine which data to use based on toggle state
       use_derivative <- show_derivative()
-      
+
       if (use_derivative) {
         # Use derivative data
         if (!is.null(uploaded_spectra_df_sg())) {
@@ -305,7 +318,7 @@ prediction_server <- function(id) {
           )
           plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
-          plot_data <- plot_data[wavelength >= 599 & wavelength <= 3997, ]
+          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
           plot_data <- plot_data[order(SSN, wavelength)]
         } else {
           plot_data <- spectral_df_sg_long
@@ -324,7 +337,7 @@ prediction_server <- function(id) {
           )
           plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
-          plot_data <- plot_data[wavelength >= 599 & wavelength <= 3997, ]
+          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
           plot_data <- plot_data[order(SSN, wavelength)]
         } else {
           plot_data <- spectral_df_long
@@ -355,6 +368,7 @@ prediction_server <- function(id) {
           xaxis = list(
             title = "Wavelength (cm<sup>-1</sup>)",
             autorange = "reversed",
+            range = c(3991, 617),
             gridcolor = "#7f8c8d",
             color = "white"
           ),
@@ -445,11 +459,11 @@ prediction_server <- function(id) {
           uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)] <- lapply(uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], as.numeric)
 
           # Calculate 1st derivatives
-          uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
+          # uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
 
           # Store processed data in reactive values
           uploaded_spectra_df(uploaded_spectral_df)
-          uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
+          # uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
           spectra_count(length(uploaded_spectra))
           spectra_processed(TRUE) # Enable predict button
 
@@ -486,7 +500,7 @@ prediction_server <- function(id) {
       # Set loading state and disable button
       prediction_loading(TRUE)
       shinyjs::disable("predict_btn")
-      shinyjs::html("predict_btn", "Processing...")
+      shinyjs::html("predict_btn", "Processing... (this might take a few...)")
 
       # Use delayed execution to show spinner first
       invalidateLater(100, session)
@@ -588,10 +602,16 @@ prediction_server <- function(id) {
             # Calculate density
             density_data <- density(prop_values, na.rm = TRUE)
 
-            # Set x-axis limits for clay and sand properties
+            # Set x-axis limits with lower bound of 0 (except for pH)
             xlim_range <- NULL
             if (prop_name %in% c("Clay_%", "Sand_%")) {
               xlim_range <- c(0, 100)
+            } else if (prop_name == "pH") {
+              # pH can be below 0, so use natural range
+              xlim_range <- NULL
+            } else {
+              # Cut at 0 for all other properties
+              xlim_range <- c(0, max(prop_values, na.rm = TRUE) * 1.1)
             }
 
             # Create the density plot
@@ -645,7 +665,7 @@ prediction_server <- function(id) {
             }
 
             text(par("usr")[2] - 0.02 * diff(par("usr")[1:2]),
-              par("usr")[4] * 0.75,
+              par("usr")[4] * 0.55,
               legend_text,
               cex = 1.6, adj = 1, col = "darkblue"
             )
@@ -680,11 +700,17 @@ prediction_server <- function(id) {
         span("(0 samples)", style = "color: #6c757d; font-size: 0.9em;")
       } else {
         unique_samples <- nrow(prediction_results())
-        span(paste0("(", unique_samples, " unqiue spectra/samples)"),
+        span(paste0("(", unique_samples, " unique spectra/samples)"),
           style = "color: #ffffff; font-weight: bold; font-size: 1.1em;"
         )
       }
     })
+
+    # Control visibility of unzip button
+    output$file_uploaded <- reactive({
+      !is.null(input$spectra_file)
+    })
+    outputOptions(output, "file_uploaded", suspendWhenHidden = FALSE)
 
     # Control visibility of predict button
     output$spectra_ready <- reactive({
@@ -706,38 +732,46 @@ prediction_server <- function(id) {
       content = function(file) {
         req(prediction_results())
         write.csv(prediction_results(), file, row.names = FALSE)
+
+        # Reset the app after download
+        uploaded_spectra_df(NULL)
+        uploaded_spectra_df_sg(NULL)
+        spectra_count(0)
+        prediction_results(NULL)
+        spectra_processed(FALSE)
+        prediction_loading(FALSE)
+        selected_row_values(NULL)
       },
       contentType = "text/csv"
     )
 
 
-    # Simple prediction status indicator
+    # Simple prediction status indicator - removed spinner
     output$prediction_spinner <- renderUI({
-      if (prediction_loading()) {
-        div(
-          class = "d-flex align-items-center text-success",
-          div(
-            class = "spinner-grow spinner-grow-sm me-2",
-            role = "status",
-            style = "color: #28a745;"
-          ),
-          span("Analyzing spectral data...", style = "color: #28a745; font-weight: 500; font-size: 0.9em;")
-        )
-      } else {
-        NULL
-      }
+      NULL
     })
 
-    # Simple progress bar for prediction process
+    # Simple progress bar for prediction process - static bar without animation
     output$prediction_progress_bar <- renderUI({
       if (prediction_loading()) {
         div(
           class = "progress mt-2",
-          style = "height: 6px;",
+          style = "height: 8px; background-color: rgba(0,0,0,0.1);",
           div(
-            class = "progress-bar progress-bar-striped progress-bar-animated bg-success",
+            class = "progress-bar bg-success",
             role = "progressbar",
-            style = "width: 100%;"
+            style = "width: 100%; transition: none;"
+          )
+        )
+      } else if (!is.null(prediction_results())) {
+        # Show completed bar briefly after success
+        div(
+          class = "progress mt-2",
+          style = "height: 8px; background-color: rgba(0,0,0,0.1);",
+          div(
+            class = "progress-bar bg-success",
+            role = "progressbar",
+            style = "width: 100%; transition: none;"
           )
         )
       } else {
