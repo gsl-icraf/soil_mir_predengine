@@ -1,4 +1,4 @@
-# CIFOR-ICRAF MIR Prediction Engine
+# CIFOR-ICRAF MIR Prediction Engine.
 
 A modern Shiny web application for soil property prediction using Mid-Infrared (MIR) spectroscopy data. Built with advanced machine learning models and a responsive user interface for real-time soil analysis.
 
