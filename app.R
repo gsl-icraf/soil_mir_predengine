@@ -17,6 +17,7 @@ library(viridis)
 # Source module files
 source("modules/home_module.R")
 source("modules/prediction_module.R")
+source("modules/instructions_module.R")
 
 # Set maximum upload size to 50 MB
 options(shiny.maxRequestSize = 50 * 1024^2)
@@ -166,6 +167,12 @@ ui <- function(request) {
             href = "?page=prediction",
             `data-page` = "prediction",
             icon("chart-line"), " Prediction Engine"
+          ),
+          a(
+            class = "nav-link",
+            href = "?page=instructions",
+            `data-page` = "instructions",
+            icon("info-circle"), " Instructions"
           )
         )
       )
@@ -191,6 +198,15 @@ ui <- function(request) {
           class = "router-page",
           prediction_ui("prediction")
         )
+      ),
+
+      # Instructions content
+      conditionalPanel(
+        condition = "input.current_page == 'instructions' || (typeof input.current_page === 'undefined' && window.currentPage === 'instructions')",
+        div(
+          class = "router-page",
+          instructions_ui("instructions")
+        )
       )
     )
   )
@@ -211,6 +227,7 @@ server <- function(input, output, session) {
   # Module servers
   home_server("home")
   prediction_server("prediction")
+  instructions_server("instructions")
 }
 
 # Run the application

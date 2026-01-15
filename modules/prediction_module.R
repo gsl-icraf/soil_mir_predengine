@@ -98,7 +98,22 @@ prediction_ui <- function(id) {
                   actionButton(ns("reset_plots"), "Reset View", class = "btn-xs btn-outline-light", style = "font-size: 0.75rem; padding: 0.2rem 0.5rem;")
                 )
               ),
-              plotlyOutput(ns("spectral_plot_combined"), height = "300px")
+              plotlyOutput(ns("spectral_plot_combined"), height = "300px"),
+              conditionalPanel(
+                condition = "output.spectra_ready == true",
+                ns = ns,
+                hr(style = "border-top: 1px solid rgba(255,255,255,0.1); margin: 1.5rem 0;"),
+                div(
+                  class = "d-flex justify-content-between align-items-center mb-1",
+                  span(list(icon("project-diagram"), " Spectral PCA Space"), style = "color: white; font-weight: bold;"),
+                ),
+                layout_columns(
+                  col_widths = c(4, 4, 4),
+                  plotlyOutput(ns("pca_plot_12"), height = "300px"),
+                  plotlyOutput(ns("pca_plot_13"), height = "300px"),
+                  plotlyOutput(ns("pca_plot_23"), height = "300px")
+                )
+              )
             )
           )
         )
@@ -240,20 +255,6 @@ prediction_server <- function(id) {
       s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
       spectra <- rbind(spectra, s_add)
     }
-
-    # spectra_names <- names(spectra)
-    # wavelengths <- spectra[[spectra_names[1]]]$ab_no_atm_comp$wavenumbers
-    # absorbance_values <- spectra[[spectra_names[1]]]$ab_no_atm_comp$data[1:length(wavelengths)]
-
-    # ssn_absorbance_values <- c(spectra[[spectra_names[1]]]$basic_metadata$opus_sample_name, absorbance_values)
-    # spectral_df <- data.table(t(ssn_absorbance_values))
-
-    # ### Get absorbance values and combine these into one matrix
-    # for (i in 2:length(spectra)) {
-    #   absorbance_values_add <- spectra[[spectra_names[i]]]$ab_no_atm_comp$data[1:length(wavelengths)]
-    #   ssn_absorbance_values_add <- c(spectra[[spectra_names[i]]]$basic_metadata$opus_sample_name, absorbance_values_add)
-    #   ssn_absorbance_values <- rbind(ssn_absorbance_values, ssn_absorbance_values_add)
-    # }
 
     spectral_df <- data.table(spectra)
     setnames(spectral_df, old = "V1", new = "SSN")
@@ -867,6 +868,148 @@ prediction_server <- function(id) {
       } else {
         selected_row_values(NULL)
       }
+    })
+
+    # PCA model
+    pca_model <- reactive({
+      readRDS("models/mir_pca_model.rds")
+    })
+
+    # Load PCA scores data
+    pca_scores_ref <- reactive({
+      fread("data/mir_pca_scores_5comp.csv")
+    })
+
+    # Projected scores for uploaded data
+    uploaded_pca_scores <- reactive({
+      req(uploaded_spectra_df())
+
+      # Copy data to avoid in-place modification issues
+      spectra_mir <- copy(uploaded_spectra_df())
+
+      # Preprocess similar to prediction function
+      # 1. Average duplicated spectra based on SSN
+      # (Already handled in unzip_btn logic currently)
+
+      # 2. Apply Savitzky-Golay smoothing and Z-score
+      # Note: process_spectra_predict uses scale() then savitzkyGolay()
+      mir_zscore <- scale(spectra_mir[, SSN := NULL])
+      spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
+
+      # 3. Reference bands for resampling
+      wavebands_ref <- read.table("data/wavebands.txt", header = FALSE)
+      wavebands_ref <- as.numeric(wavebands_ref$V1)
+
+      # 4. Select and Resample
+      headers_spectra <- as.numeric(colnames(spectra_mir)[-1]) # SSN was already removed by scale step above? Wait.
+      # Actually scale() returns a matrix.
+      # Let's fix the scale/SSN logic
+
+      # Re-do preprocessing correctly to match src/spectra_process_predict.R
+      spectra_dt <- copy(uploaded_spectra_df())
+      ssn_labels <- spectra_dt$SSN
+      spectra_dt[, SSN := NULL]
+
+      mir_zscore <- scale(spectra_dt)
+      spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
+
+      # Wavelength selection
+      headers_spectra <- as.numeric(colnames(spectra_dt))
+      band_sel <- headers_spectra >= 617 & headers_spectra <= 3991
+      spectra_mir_sel <- spectra_mir_sg[, ..band_sel]
+
+      resampled_spectra <- resample(spectra_mir_sel, wav = colnames(spectra_mir_sel), new.wav = wavebands_ref)
+      colnames(resampled_spectra) <- paste0("w", wavebands_ref)
+
+      # 5. Project using PCA model
+      pca_res <- predict(pca_model(), resampled_spectra)
+
+      # Return as data table with SSN
+      dt_scores <- as.data.table(pca_res)
+      dt_scores[, SSN := ssn_labels]
+      dt_scores
+    })
+
+    # Helper function for PCA contour plots with overlay
+    render_pca_contour <- function(pca_df, x_var, y_var, title, overlay_df = NULL) {
+      p <- plot_ly(pca_df, x = as.formula(paste0("~", x_var)), y = as.formula(paste0("~", y_var))) |>
+        add_histogram2dcontour(
+          colorscale = list(
+            list(0, "rgba(0, 0, 0, 0)"),
+            list(0.1, "rgba(30, 0, 80, 0.3)"),
+            list(0.3, "rgba(50, 0, 150, 0.5)"),
+            list(0.6, "rgba(100, 50, 200, 0.7)"),
+            list(1, "rgba(0, 255, 136, 0.9)")
+          ),
+          showscale = FALSE,
+          ncontours = 25,
+          line = list(width = 0.5, color = "rgba(255,255,255,0.1)"),
+          hoverinfo = "none",
+          name = "Reference Density"
+        )
+
+      # Add overlay if provided
+      if (!is.null(overlay_df) && nrow(overlay_df) > 0) {
+        p <- p |>
+          add_trace(
+            data = overlay_df,
+            x = as.formula(paste0("~", x_var)),
+            y = as.formula(paste0("~", y_var)),
+            type = "scatter",
+            mode = "markers",
+            marker = list(
+              color = "#ff9100", # ICRAF Orange
+              size = 8,
+              line = list(color = "white", width = 1),
+              opacity = 0.8
+            ),
+            text = ~SSN,
+            hovertemplate = "<b>SSN: %{text}</b><extra></extra>",
+            name = "Uploaded Spectra"
+          )
+      }
+
+      p |>
+        layout(
+          plot_bgcolor = "#222222",
+          paper_bgcolor = "rgba(0,0,0,0)",
+          xaxis = list(
+            title = x_var,
+            gridcolor = "#333333",
+            zerolinecolor = "#444444",
+            color = "white",
+            titlefont = list(size = 10),
+            tickfont = list(size = 8)
+          ),
+          yaxis = list(
+            title = y_var,
+            gridcolor = "#333333",
+            zerolinecolor = "#444444",
+            color = "white",
+            titlefont = list(size = 10),
+            tickfont = list(size = 8)
+          ),
+          margin = list(l = 30, r = 10, b = 30, t = 40),
+          title = list(
+            text = title,
+            font = list(color = "rgba(255,255,255,0.8)", size = 11),
+            y = 0.98
+          ),
+          showlegend = FALSE
+        ) |>
+        config(displayModeBar = FALSE)
+    }
+
+    output$pca_plot_12 <- renderPlotly({
+      render_pca_contour(pca_scores_ref(), "PC1", "PC2", "PC1 vs PC2", uploaded_pca_scores())
+    })
+
+    output$pca_plot_13 <- renderPlotly({
+      render_pca_contour(pca_scores_ref(), "PC1", "PC3", "PC1 vs PC3", uploaded_pca_scores())
+    })
+
+    output$pca_plot_23 <- renderPlotly({
+      render_pca_contour(pca_scores_ref(), "PC2", "PC3", "PC2 vs PC3", uploaded_pca_scores())
     })
   })
 }
