@@ -4,12 +4,14 @@ library(bslib)
 library(data.table)
 library(plotly)
 library(shinyjs)
-library(opusreader2)
+library(opusreader)
 library(mirai)
 library(prospectr)
 library(DT)
 library(ranger)
 library(mirai)
+library(qs)
+library(viridis)
 
 
 # Source module files
@@ -52,7 +54,7 @@ ui <- function(request) {
 
     # Initialize shinyjs
     useShinyjs(),
-    
+
     # Hidden input to store current page (helps with initialization)
     tags$input(id = "current_page", type = "hidden", value = url_path),
 
@@ -60,78 +62,78 @@ ui <- function(request) {
     tags$script(HTML('
       // Global variable to track current page
       window.currentPage = null;
-      
+
       // Determine page from URL immediately
       function getPageFromURL() {
         var urlParams = new URLSearchParams(window.location.search);
         return urlParams.get("page") || "home";
       }
-      
+
       // Set the current page immediately
       window.currentPage = getPageFromURL();
-      
+
       // Initialize routing system
       $(document).ready(function() {
         initializeRouting();
       });
-      
+
       function initializeRouting() {
         var initialPage = getPageFromURL();
         window.currentPage = initialPage;
-        
+
         console.log("Initializing routing:", {
           initialPage: initialPage,
           fullUrl: window.location.href
         });
-        
+
         // Set initial active navigation
         updateActiveNavigation(initialPage);
-        
+
         // Set the hidden input value
         $("#current_page").val(initialPage);
-        
+
         // Ensure Shiny knows the current page (with delay to ensure Shiny is ready)
         setTimeout(function() {
           Shiny.setInputValue("current_page", initialPage, {priority: "event"});
         }, 100);
       }
-      
+
       function updateActiveNavigation(page) {
         $(".nav-link").removeClass("active");
         $(".nav-link[data-page=\\"" + page + "\\"]").addClass("active");
       }
-      
+
       // Handle navigation clicks
       $(document).on("click", ".nav-link", function(e) {
         e.preventDefault();
         var page = $(this).data("page");
         window.currentPage = page;
-        
+
         // Update URL
         var newUrl = window.location.pathname + "?page=" + page;
         window.history.pushState({page: page}, null, newUrl);
-        
+
         // Update hidden input
         $("#current_page").val(page);
-        
+
         // Update Shiny
         Shiny.setInputValue("current_page", page, {priority: "event"});
-        
+
         // Update navigation
         updateActiveNavigation(page);
       });
-      
+
       // Handle browser back/forward buttons
       window.addEventListener("popstate", function(event) {
         var page = getPageFromURL();
         window.currentPage = page;
-        
+
         // Update hidden input
         $("#current_page").val(page);
-        
+
         // Update Shiny
         Shiny.setInputValue("current_page", page, {priority: "event"});
-        
+
         // Update navigation
         updateActiveNavigation(page);
       });

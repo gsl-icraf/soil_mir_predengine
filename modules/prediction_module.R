@@ -4,18 +4,13 @@ prediction_ui <- function(id) {
 
   tagList(
     h2("Prediction Engine", class = "mb-4"),
+    navset_card_tab(
+      id = ns("prediction_tabs"),
 
-    # Input controls card with spectral styling
-    layout_columns(
-      col_widths = c(12),
-
-      # Controls section
-      card(
-        class = "spectral-card",
-        card_header(
-          icon("upload"), " Upload soil spectra data!",
-          class = "bg-gradient text-white"
-        ),
+      # Tab 1: Spectral Data and Upload
+      nav_panel(
+        title = list(icon("wave-square"), "Spectral Data"),
+        value = "data",
         card_body(
           layout_columns(
             col_widths = c(4, 8),
@@ -89,24 +84,6 @@ prediction_ui <- function(id) {
                   # Progress bar container
                   uiOutput(ns("prediction_progress_bar"))
                 ),
-
-                # Download button (only show after successful predictions)
-                conditionalPanel(
-                  condition = "output.predictions_ready == true",
-                  ns = ns,
-                  div(
-                    class = "mt-2",
-                    downloadButton(
-                      ns("download_predictions"),
-                      label = list(icon("download"), " Download Results (CSV)"),
-                      class = "btn-outline-success btn-sm",
-                      style = "width: 100%;"
-                    ),
-                    p("Downloading the results will reset the app for new predictions.",
-                      style = "font-size: 0.8em; color: #6c757d; margin-top: 4px;"
-                    )
-                  )
-                )
               )
             ),
 
@@ -125,46 +102,50 @@ prediction_ui <- function(id) {
             )
           )
         )
-      )
-    ),
+      ),
 
-    # Prediction results table (only show when predictions are complete)
-    conditionalPanel(
-      condition = "output.predictions_ready == true",
-      ns = ns,
-      div(
-        class = "mt-4",
-        card(
-          class = "spectral-card",
-          card_header(
-            div(
-              class = "d-flex justify-content-between align-items-center",
-              span(list(icon("table"), " Prediction Results")),
-              uiOutput(ns("prediction_count_display"))
+      # Tab 2: Prediction Results (conditional)
+      nav_panel(
+        title = list(icon("table"), "Prediction Results"),
+        value = "results",
+        card_body(
+          # Results table card
+          div(
+            class = "mb-4",
+            card(
+              class = "spectral-card",
+              card_header(
+                div(
+                  class = "d-flex justify-content-between align-items-center",
+                  span(list(icon("table"), " Prediction Results")),
+                  div(
+                    class = "d-flex align-items-center gap-3",
+                    uiOutput(ns("prediction_count_display")),
+                    downloadButton(
+                      ns("download_predictions"),
+                      label = list(icon("download"), " Download Results (CSV)"),
+                      class = "btn-success btn-xs"
+                    )
+                  )
+                ),
+                class = "bg-gradient text-white"
+              ),
+              card_body(
+                DT::dataTableOutput(ns("prediction_table"))
+              )
+            )
+          ),
+
+          # Density plots card
+          card(
+            class = "spectral-card",
+            card_header(
+              icon("chart-area"), " Soil Property Distributions",
+              class = "bg-gradient text-white"
             ),
-            class = "bg-gradient text-white"
-          ),
-          card_body(
-            DT::dataTableOutput(ns("prediction_table"))
-          )
-        )
-      )
-    ),
-
-    # Prediction visualization card with density plots (only show when predictions are complete)
-    conditionalPanel(
-      condition = "output.predictions_ready == true",
-      ns = ns,
-      div(
-        class = "mt-4",
-        card(
-          class = "spectral-card",
-          card_header(
-            icon("chart-area"), " Soil Property Distributions",
-            class = "bg-gradient text-white"
-          ),
-          card_body(
-            plotOutput(ns("prediction_plot"), height = "600px")
+            card_body(
+              plotOutput(ns("prediction_plot"), height = "600px")
+            )
           )
         )
       )
@@ -226,27 +207,56 @@ prediction_ui <- function(id) {
 # Prediction Module Server
 prediction_server <- function(id) {
   moduleServer(id, function(input, output, session) {
+    # Initially hide the results tab
+    nav_hide("prediction_tabs", "results")
+
+    # Show/hide results tab based on prediction availability
+    observe({
+      results_ready <- !is.null(prediction_results()) && nrow(prediction_results()) > 0
+
+      if (results_ready) {
+        nav_show("prediction_tabs", "results")
+        nav_select("prediction_tabs", "results")
+      } else {
+        nav_hide("prediction_tabs", "results")
+        nav_select("prediction_tabs", "data")
+      }
+    })
+
     ## On load...
     ### Sample spectral data
 
     sample_spectra <- list.files(path = "data/sample_spectra", pattern = "*.0", full.names = TRUE)
-    spectra <- read_opus(sample_spectra, parallel = TRUE)
+    # spectra <- read_opus(sample_spectra, parallel = TRUE)
 
-    spectra_names <- names(spectra)
-    wavelengths <- spectra[[spectra_names[1]]]$ab_no_atm_comp$wavenumbers
-    absorbance_values <- spectra[[spectra_names[1]]]$ab_no_atm_comp$data[1:length(wavelengths)]
-    ssn_absorbance_values <- c(spectra[[spectra_names[1]]]$basic_metadata$opus_sample_name, absorbance_values)
-    spectral_df <- data.table(t(ssn_absorbance_values))
+    # Process uploaded spectral data
+    s <- opus_read(sample_spectra[1])
+    spectra <- cbind(s$metadata$sample_id, s$spec)
 
-    ### Get absorbance values and combine these into one matrix
-    for (i in 2:length(spectra)) {
-      absorbance_values_add <- spectra[[spectra_names[i]]]$ab_no_atm_comp$data[1:length(wavelengths)]
-      ssn_absorbance_values_add <- c(spectra[[spectra_names[i]]]$basic_metadata$opus_sample_name, absorbance_values_add)
-      ssn_absorbance_values <- rbind(ssn_absorbance_values, ssn_absorbance_values_add)
+    ## Load additional files
+    for (i in 2:length(sample_spectra)) {
+      opus_file <- sample_spectra[i]
+      s_add <- opus_read(opus_file)
+      s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
+      spectra <- rbind(spectra, s_add)
     }
 
-    spectral_df <- data.table(ssn_absorbance_values)
-    colnames(spectral_df) <- c("SSN", as.character(wavelengths))
+    # spectra_names <- names(spectra)
+    # wavelengths <- spectra[[spectra_names[1]]]$ab_no_atm_comp$wavenumbers
+    # absorbance_values <- spectra[[spectra_names[1]]]$ab_no_atm_comp$data[1:length(wavelengths)]
+
+    # ssn_absorbance_values <- c(spectra[[spectra_names[1]]]$basic_metadata$opus_sample_name, absorbance_values)
+    # spectral_df <- data.table(t(ssn_absorbance_values))
+
+    # ### Get absorbance values and combine these into one matrix
+    # for (i in 2:length(spectra)) {
+    #   absorbance_values_add <- spectra[[spectra_names[i]]]$ab_no_atm_comp$data[1:length(wavelengths)]
+    #   ssn_absorbance_values_add <- c(spectra[[spectra_names[i]]]$basic_metadata$opus_sample_name, absorbance_values_add)
+    #   ssn_absorbance_values <- rbind(ssn_absorbance_values, ssn_absorbance_values_add)
+    # }
+
+    spectral_df <- data.table(spectra)
+    setnames(spectral_df, old = "V1", new = "SSN")
     spectral_df[, 2:4840] <- lapply(spectral_df[, 2:4840], as.numeric)
 
     ## 1st derivatives
@@ -316,8 +326,13 @@ prediction_server <- function(id) {
             variable.name = "wavelength",
             value.name = "absorbance_values"
           )
+
+          plot_data[, absorbance_values := as.numeric(as.character(absorbance_values))]
+
           plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
+
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
+
           plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
           plot_data <- plot_data[order(SSN, wavelength)]
         } else {
@@ -335,6 +350,7 @@ prediction_server <- function(id) {
             variable.name = "wavelength",
             value.name = "absorbance_values"
           )
+
           plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
           plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
@@ -378,8 +394,8 @@ prediction_server <- function(id) {
             color = "white"
           ),
           dragmode = "zoom",
-          plot_bgcolor = "#2c3e50",
-          paper_bgcolor = "#34495e",
+          plot_bgcolor = "#2d2d2d",
+          paper_bgcolor = "#2d2d2d",
           font = list(color = "white")
         ) |>
         event_register("plotly_relayout") |>
@@ -434,37 +450,55 @@ prediction_server <- function(id) {
           showNotification(paste("Processing", length(opus_files), "spectral files..."), type = "message")
 
           # Process uploaded spectral data
-          uploaded_spectra <- read_opus(opus_files, parallel = TRUE)
+          opus_file <- opus_files[1]
+          s <- opus_read(opus_file)
+          uploaded_spectra <- cbind(s$metadata$sample_id, s$spec)
+
+          ## Load additional files
+          for (i in 2:length(opus_files)) {
+            opus_file <- opus_files[i]
+            s_add <- opus_read(opus_file)
+            s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
+            uploaded_spectra <- rbind(uploaded_spectra, s_add)
+          }
+
+          uploaded_spectra <- data.table(uploaded_spectra)
+          uploaded_spectra[, SSN := V1]
+          cols_to_convert <- names(uploaded_spectra)[-which(names(uploaded_spectra) == "SSN")]
+          uploaded_spectra <- uploaded_spectra[, (cols_to_convert) := lapply(.SD, as.numeric), .SDcols = cols_to_convert]
+          uploaded_spectral_df <- uploaded_spectra[, lapply(.SD, mean), by = SSN, .SDcols = cols_to_convert]
+
+          # uploaded_spectra <- read_opus(opus_files, parallel = TRUE)
 
           if (length(uploaded_spectra) == 0) {
             showNotification("Failed to read spectral data from uploaded files.", type = "error")
             return()
           }
 
-          # Process the uploaded spectra similar to sample data
-          uploaded_spectra_names <- names(uploaded_spectra)
-          uploaded_wavelengths <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$wavenumbers
-          uploaded_absorbance_values <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-          uploaded_ssn_absorbance_values <- c(uploaded_spectra[[uploaded_spectra_names[1]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values)
+          # # Process the uploaded spectra similar to sample data
+          # uploaded_spectra_names <- names(uploaded_spectra)
+          uploaded_wavelengths <- colnames(uploaded_spectral_df)[2:ncol(uploaded_spectral_df)]
+          # uploaded_absorbance_values <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
+          # uploaded_ssn_absorbance_values <- c(uploaded_spectra[[uploaded_spectra_names[1]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values)
 
-          # Combine all uploaded spectra
-          for (i in 2:length(uploaded_spectra)) {
-            uploaded_absorbance_values_add <- uploaded_spectra[[uploaded_spectra_names[i]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-            uploaded_ssn_absorbance_values_add <- c(uploaded_spectra[[uploaded_spectra_names[i]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values_add)
-            uploaded_ssn_absorbance_values <- rbind(uploaded_ssn_absorbance_values, uploaded_ssn_absorbance_values_add)
-          }
+          # # Combine all uploaded spectra
+          # for (i in 2:length(uploaded_spectra)) {
+          #   uploaded_absorbance_values_add <- uploaded_spectra[[uploaded_spectra_names[i]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
+          #   uploaded_ssn_absorbance_values_add <- c(uploaded_spectra[[uploaded_spectra_names[i]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values_add)
+          #   uploaded_ssn_absorbance_values <- rbind(uploaded_ssn_absorbance_values, uploaded_ssn_absorbance_values_add)
+          # }
 
-          uploaded_spectral_df <- data.table(uploaded_ssn_absorbance_values)
+          # uploaded_spectral_df <- data.table(uploaded_ssn_absorbance_values)
           colnames(uploaded_spectral_df) <- c("SSN", as.character(uploaded_wavelengths))
           uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)] <- lapply(uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], as.numeric)
 
           # Calculate 1st derivatives
-          # uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
+          uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
 
           # Store processed data in reactive values
           uploaded_spectra_df(uploaded_spectral_df)
           # uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
-          spectra_count(length(uploaded_spectra))
+          spectra_count(length(unique(uploaded_spectra$SSN)))
           spectra_processed(TRUE) # Enable predict button
 
           showNotification(paste("Successfully processed", length(uploaded_spectra), "spectral files!"), type = "success")
@@ -482,10 +516,8 @@ prediction_server <- function(id) {
     prediction_result <- reactiveVal(NULL)
 
     # ============================================================================
-    # Prediction Handler with Progress Indicators
+    # Progress Indicators
     # ============================================================================
-    # Handles soil property prediction with comprehensive user feedback:
-    # - Button state management (disable/enable)
     # - Spinner and progress bar indicators
     # - Success/error notifications
     # ============================================================================
@@ -507,8 +539,14 @@ prediction_server <- function(id) {
 
       tryCatch(
         {
+          # Log start of prediction
+          cat("Starting prediction process...\n")
+          cat("Input data dimensions:", nrow(uploaded_spectra_df()), "x", ncol(uploaded_spectra_df()), "\n")
+
           # Call the actual prediction function
           predictions <- process_spectra_predict(spectra_mir = uploaded_spectra_df())
+
+          cat("Prediction completed. Output dimensions:", nrow(predictions), "x", ncol(predictions), "\n")
 
           # Rename columns for better display
           colnames(predictions) <- c(
@@ -528,6 +566,13 @@ prediction_server <- function(id) {
           )
         },
         error = function(e) {
+          # Log detailed error information
+          cat("ERROR in prediction:\n")
+          cat("Message:", e$message, "\n")
+          cat("Call:", deparse(e$call), "\n")
+          cat("Traceback:\n")
+          print(sys.calls())
+
           prediction_loading(FALSE)
           shinyjs::enable("predict_btn")
           shinyjs::html("predict_btn", paste(icon("flask"), " Predict Soil Properties"))

@@ -1,0 +1,10 @@
+name: pred_engine
+title:
+username: landscapeportal
+account: landscapeportal
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16005148
+bundleId: 11152252
+url: https://landscapeportal.shinyapps.io/pred_engine/
+version: 1
