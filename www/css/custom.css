@@ -952,18 +952,8 @@ body {
 }
 
 .progress-bar {
-  transition: width 0.6s ease;
-  background: linear-gradient(45deg, 
-    #28a745 25%, 
-    transparent 25%, 
-    transparent 50%, 
-    #28a745 50%, 
-    #28a745 75%, 
-    transparent 75%, 
-    transparent
-  );
-  background-size: 20px 20px;
-  animation: progress-animation 1s linear infinite;
+  transition: none;
+  background: #28a745;
 }
 
 @keyframes progress-animation {

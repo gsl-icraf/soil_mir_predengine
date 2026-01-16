@@ -18,11 +18,14 @@ required_packages <- c(
   "plotly", # Interactive plots
   "data.table", # Fast data processing
   "stringr",
-  "qs" # Fast serialization
+  "qs", # Fast serialization
+  "remotes",
+  "opusreader",
+  "arrow"
 )
 
-packages_from_r_universe <- c(
-  "opusreader2" # For reading Opus binary spectral data
+packages_from_github <- c(
+  "opusreader" # For reading Opus binary spectral data
 )
 
 # Function to check and install packages
@@ -37,14 +40,25 @@ install_if_missing <- function(packages) {
   }
 }
 
-install_r_universe_packages <- function(packages) {
+# install_r_universe_packages <- function(packages) {
+#   for (pkg in packages) {
+#     if (!requireNamespace(pkg, quietly = TRUE)) {
+#       cat("Installing package from R-universe:", pkg, "\n")
+#       install.packages(packages_from_r_universe, repos = c(
+#         spectralcockpit = "https://spectral-cockpit.r-universe.dev",
+#         CRAN = "https://cloud.r-project.org"
+#       ))
+#     } else {
+#       cat("Package", pkg, "is already installed\n")
+#     }
+#   }
+# }
+
+install_github_packages <- function(packages) {
   for (pkg in packages) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
-      cat("Installing package from R-universe:", pkg, "\n")
-      install.packages(packages_from_r_universe, repos = c(
-        spectralcockpit = "https://spectral-cockpit.r-universe.dev",
-        CRAN = "https://cloud.r-project.org"
-      ))
+      cat("Installing package from GitHub:", pkg, "\n")
+      remotes::install_github("pierreroudier/opusreader")
     } else {
       cat("Package", pkg, "is already installed\n")
     }
@@ -54,7 +68,8 @@ install_r_universe_packages <- function(packages) {
 # Install missing packages
 cat("Checking and installing required packages...\n")
 install_if_missing(required_packages)
-install_r_universe_packages(packages_from_r_universe)
+install_github_packages(packages_from_github)
+# install_r_universe_packages(packages_from_r_universe)
 
 # Load the main app
 cat("\nAll packages installed successfully!\n")

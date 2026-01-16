@@ -221,7 +221,7 @@ function debounce(func, wait, immediate) {
 // Responsive Utilities
 // =========================================================================
 
-// Handle responsive behavior
+// Handle responsive behavior with longer debounce
 $(window).on('resize', debounce(function() {
   // Recalculate layouts on window resize
   resizeCharts();
@@ -232,7 +232,7 @@ $(window).on('resize', debounce(function() {
   } else {
     $('.bslib-sidebar').removeClass('mobile-sidebar');
   }
-}, 250));
+}, 500));
 
 // =========================================================================
 // Router Navigation Functions
@@ -317,8 +317,12 @@ function initializeSpectralParticles() {
     setTimeout(() => createParticle(), i * 200);
   }
   
-  // Continue creating particles
-  setInterval(createParticle, 800);
+  // Continue creating particles with limit check
+  setInterval(() => {
+    if (particlesContainer.children('.particle').length < 20) {
+      createParticle();
+    }
+  }, 800);
 }
 
 // =========================================================================
