@@ -107,7 +107,8 @@ instructions_ui <- function(id) {
                     tags$ul(
                         tags$li("View the results in the ", tags$strong("Prediction Results"), " tab."),
                         tags$li("Analyze the data density using the ", tags$strong("PCA Diagnostic"), " plots."),
-                        tags$li("Download your predictions in ", tags$strong("CSV, Excel, or Copy"), " formats.")
+                        tags$li("Download your predictions in ", tags$strong("CSV, Excel, or Copy"), " formats."),
+                        tags$li("Download ", tags$strong("Raw Spectra"), " and ", tags$strong("1st Derivatives"), " CSV files below the preview plot.")
                     )
                 )
             )

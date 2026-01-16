@@ -23,12 +23,8 @@ source("modules/instructions_module.R")
 options(shiny.maxRequestSize = 50 * 1024^2)
 # Mirai daemons
 daemons(n = 2L, dispatcher = TRUE)
-# Processing and prediction function
-source("src/spectra_process_predict.R")
-
 # Source prediction processing function
 source("src/spectra_process_predict.R")
-##
 options(shiny.maxRequestSize = 50 * 1024^2)
 # Define UI with URL-aware navigation
 ui <- function(request) {

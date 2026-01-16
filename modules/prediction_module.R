@@ -102,16 +102,32 @@ prediction_ui <- function(id) {
               conditionalPanel(
                 condition = "output.spectra_ready == true",
                 ns = ns,
-                hr(style = "border-top: 1px solid rgba(255,255,255,0.1); margin: 1.5rem 0;"),
-                div(
-                  class = "d-flex justify-content-between align-items-center mb-1",
-                  span(list(icon("project-diagram"), " Spectral PCA Space"), style = "color: white; font-weight: bold;"),
+                card(
+                  full_screen = TRUE,
+                  class = "bg-dark border-0",
+                  card_header(
+                    div(
+                      class = "d-flex justify-content-between align-items-center",
+                      span(list(icon("project-diagram"), " Spectral PCA Space"), style = "color: white; font-weight: bold;"),
+                    )
+                  ),
+                  card_body(
+                    layout_columns(
+                      col_widths = c(4, 4, 4),
+                      plotlyOutput(ns("pca_plot_12"), height = "300px"),
+                      plotlyOutput(ns("pca_plot_13"), height = "300px"),
+                      plotlyOutput(ns("pca_plot_23"), height = "300px")
+                    )
+                  )
                 ),
-                layout_columns(
-                  col_widths = c(4, 4, 4),
-                  plotlyOutput(ns("pca_plot_12"), height = "300px"),
-                  plotlyOutput(ns("pca_plot_13"), height = "300px"),
-                  plotlyOutput(ns("pca_plot_23"), height = "300px")
+                conditionalPanel(
+                  condition = "output.predictions_ready == true",
+                  ns = ns,
+                  div(
+                    class = "d-flex justify-content-center gap-3 mt-3",
+                    downloadButton(ns("download_raw"), "Download Raw Spectra", class = "btn-outline-info", style = "font-size: 1.1rem;"),
+                    downloadButton(ns("download_deriv"), "Download 1st Derivatives", class = "btn-outline-warning", style = "font-size: 1.1rem;")
+                  )
                 )
               )
             )
@@ -292,6 +308,8 @@ prediction_server <- function(id) {
 
     # Reactive value for derivative toggle
     show_derivative <- reactiveVal(FALSE)
+    # Reactive value for linked selection from PCA
+    selected_ssn <- reactiveVal(NULL)
 
     # Toggle derivative button handler
     observeEvent(input$toggle_derivative, {
@@ -367,7 +385,7 @@ prediction_server <- function(id) {
       n_samples <- length(unique(plot_data$SSN))
       plasma_colors <- viridis::plasma(n_samples)
 
-      plot_data |>
+      p <- plot_data |>
         plot_ly(
           x = ~wavelength,
           y = ~absorbance_values,
@@ -380,45 +398,79 @@ prediction_server <- function(id) {
         layout(
           title = list(
             text = plot_title,
-            font = list(color = "white", size = 16)
+            font = list(color = "white", size = 20)
           ),
           xaxis = list(
             title = "Wavelength (cm<sup>-1</sup>)",
             autorange = "reversed",
             range = c(3991, 617),
             gridcolor = "#7f8c8d",
-            color = "white"
+            color = "white",
+            titlefont = list(size = 18),
+            tickfont = list(size = 16)
           ),
           yaxis = list(
             title = y_title,
             gridcolor = "#7f8c8d",
-            color = "white"
+            color = "white",
+            titlefont = list(size = 18),
+            tickfont = list(size = 16)
           ),
           dragmode = "zoom",
           plot_bgcolor = "#2d2d2d",
           paper_bgcolor = "#2d2d2d",
-          font = list(color = "white")
-        ) |>
+          font = list(color = "white"),
+          hoverlabel = list(
+            font = list(size = 16)
+          )
+        )
+
+      # Highlight selected SSN if any
+      if (!is.null(selected_ssn())) {
+        highlight_ssn <- selected_ssn()
+        highlight_data <- plot_data[SSN == highlight_ssn]
+
+        if (nrow(highlight_data) > 0) {
+          p <- p |>
+            add_trace(
+              data = highlight_data,
+              x = ~wavelength,
+              y = ~absorbance_values,
+              type = "scatter",
+              mode = "lines",
+              line = list(color = "#FF0000", width = 3),
+              name = paste("Selected:", highlight_ssn),
+              hoverinfo = "name",
+              inherit = FALSE
+            )
+        }
+      }
+
+      p |>
         event_register("plotly_relayout") |>
         event_register("plotly_doubleclick")
     })
 
-    # Reset plot when double-clicking
+    # Reset plot and selection when double-clicking
     observeEvent(event_data("plotly_doubleclick", source = "spectral_plot_combined"), {
       plotlyProxy("spectral_plot_combined", session) %>%
         plotlyProxyInvoke("relayout", list("xaxis.autorange" = TRUE, "yaxis.autorange" = TRUE))
+      selected_ssn(NULL)
     })
 
-    # Reset plot when reset button is clicked
+    # Reset selection when reset button is clicked
     observeEvent(input$reset_plots, {
       plotlyProxy("spectral_plot_combined", session) %>%
         plotlyProxyInvoke("relayout", list("xaxis.autorange" = TRUE, "yaxis.autorange" = TRUE))
+      selected_ssn(NULL)
     })
 
     ### File upload and processing
     # Reactive values to store uploaded spectral data
     uploaded_spectra_df <- reactiveVal(NULL)
     uploaded_spectra_df_sg <- reactiveVal(NULL)
+    uploaded_spectra_resampled_df <- reactiveVal(NULL)
+    uploaded_spectra_resampled_df_sg <- reactiveVal(NULL)
     spectra_count <- reactiveVal(0)
 
     # Reactive values for prediction
@@ -498,7 +550,7 @@ prediction_server <- function(id) {
 
           # Store processed data in reactive values
           uploaded_spectra_df(uploaded_spectral_df)
-          # uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
+          uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
           spectra_count(length(unique(uploaded_spectra$SSN)))
           spectra_processed(TRUE) # Enable predict button
 
@@ -545,7 +597,12 @@ prediction_server <- function(id) {
           cat("Input data dimensions:", nrow(uploaded_spectra_df()), "x", ncol(uploaded_spectra_df()), "\n")
 
           # Call the actual prediction function
-          predictions <- process_spectra_predict(spectra_mir = uploaded_spectra_df())
+          results <- process_spectra_predict(spectra_mir = uploaded_spectra_df())
+          predictions <- results$predictions
+
+          # Store resampled data for downloads
+          uploaded_spectra_resampled_df(results$raw_resampled)
+          uploaded_spectra_resampled_df_sg(results$deriv_resampled)
 
           cat("Prediction completed. Output dimensions:", nrow(predictions), "x", ncol(predictions), "\n")
 
@@ -782,6 +839,8 @@ prediction_server <- function(id) {
         # Reset the app after download
         uploaded_spectra_df(NULL)
         uploaded_spectra_df_sg(NULL)
+        uploaded_spectra_resampled_df(NULL)
+        uploaded_spectra_resampled_df_sg(NULL)
         spectra_count(0)
         prediction_results(NULL)
         spectra_processed(FALSE)
@@ -884,27 +943,6 @@ prediction_server <- function(id) {
     uploaded_pca_scores <- reactive({
       req(uploaded_spectra_df())
 
-      # Copy data to avoid in-place modification issues
-      spectra_mir <- copy(uploaded_spectra_df())
-
-      # Preprocess similar to prediction function
-      # 1. Average duplicated spectra based on SSN
-      # (Already handled in unzip_btn logic currently)
-
-      # 2. Apply Savitzky-Golay smoothing and Z-score
-      # Note: process_spectra_predict uses scale() then savitzkyGolay()
-      mir_zscore <- scale(spectra_mir[, SSN := NULL])
-      spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
-
-      # 3. Reference bands for resampling
-      wavebands_ref <- read.table("data/wavebands.txt", header = FALSE)
-      wavebands_ref <- as.numeric(wavebands_ref$V1)
-
-      # 4. Select and Resample
-      headers_spectra <- as.numeric(colnames(spectra_mir)[-1]) # SSN was already removed by scale step above? Wait.
-      # Actually scale() returns a matrix.
-      # Let's fix the scale/SSN logic
-
       # Re-do preprocessing correctly to match src/spectra_process_predict.R
       spectra_dt <- copy(uploaded_spectra_df())
       ssn_labels <- spectra_dt$SSN
@@ -912,6 +950,10 @@ prediction_server <- function(id) {
 
       mir_zscore <- scale(spectra_dt)
       spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
+
+      # 3. Reference bands for resampling
+      wavebands_ref <- read.table("data/wavebands.txt", header = FALSE)
+      wavebands_ref <- as.numeric(wavebands_ref$V1)
 
       # Wavelength selection
       headers_spectra <- as.numeric(colnames(spectra_dt))
@@ -931,8 +973,8 @@ prediction_server <- function(id) {
     })
 
     # Helper function for PCA contour plots with overlay
-    render_pca_contour <- function(pca_df, x_var, y_var, title, overlay_df = NULL) {
-      p <- plot_ly(pca_df, x = as.formula(paste0("~", x_var)), y = as.formula(paste0("~", y_var))) |>
+    render_pca_contour <- function(pca_df, x_var, y_var, title, overlay_df = NULL, source_id = NULL) {
+      p <- plot_ly(pca_df, x = as.formula(paste0("~", x_var)), y = as.formula(paste0("~", y_var)), source = source_id) |>
         add_histogram2dcontour(
           colorscale = list(
             list(0, "rgba(0, 0, 0, 0)"),
@@ -957,6 +999,7 @@ prediction_server <- function(id) {
             y = as.formula(paste0("~", y_var)),
             type = "scatter",
             mode = "markers",
+            customdata = ~SSN,
             marker = list(
               color = "#ff9100", # ICRAF Orange
               size = 8,
@@ -978,38 +1021,84 @@ prediction_server <- function(id) {
             gridcolor = "#333333",
             zerolinecolor = "#444444",
             color = "white",
-            titlefont = list(size = 10),
-            tickfont = list(size = 8)
+            titlefont = list(size = 16),
+            tickfont = list(size = 14)
           ),
           yaxis = list(
             title = y_var,
             gridcolor = "#333333",
             zerolinecolor = "#444444",
             color = "white",
-            titlefont = list(size = 10),
-            tickfont = list(size = 8)
+            titlefont = list(size = 16),
+            tickfont = list(size = 14)
           ),
-          margin = list(l = 30, r = 10, b = 30, t = 40),
+          margin = list(l = 50, r = 20, b = 50, t = 60),
           title = list(
             text = title,
-            font = list(color = "rgba(255,255,255,0.8)", size = 11),
+            font = list(color = "rgba(255,255,255,0.9)", size = 18),
             y = 0.98
+          ),
+          hoverlabel = list(
+            font = list(size = 16)
           ),
           showlegend = FALSE
         ) |>
-        config(displayModeBar = FALSE)
+        config(displayModeBar = FALSE) |>
+        event_register("plotly_click")
     }
 
+    # Observe clicks on PCA plots
+    observe({
+      click_12 <- event_data("plotly_click", source = "pca_plot_12")
+      click_13 <- event_data("plotly_click", source = "pca_plot_13")
+      click_23 <- event_data("plotly_click", source = "pca_plot_23")
+
+      clicked_ssn <- NULL
+      if (!is.null(click_12)) clicked_ssn <- click_12$customdata
+      if (!is.null(click_13)) clicked_ssn <- click_13$customdata
+      if (!is.null(click_23)) clicked_ssn <- click_23$customdata
+
+      if (!is.null(clicked_ssn)) {
+        selected_ssn(clicked_ssn)
+      }
+    })
+
     output$pca_plot_12 <- renderPlotly({
-      render_pca_contour(pca_scores_ref(), "PC1", "PC2", "PC1 vs PC2", uploaded_pca_scores())
+      render_pca_contour(pca_scores_ref(), "PC1", "PC2", "PC1 vs PC2", uploaded_pca_scores(), source_id = "pca_plot_12")
     })
 
     output$pca_plot_13 <- renderPlotly({
-      render_pca_contour(pca_scores_ref(), "PC1", "PC3", "PC1 vs PC3", uploaded_pca_scores())
+      render_pca_contour(pca_scores_ref(), "PC1", "PC3", "PC1 vs PC3", uploaded_pca_scores(), source_id = "pca_plot_13")
     })
 
     output$pca_plot_23 <- renderPlotly({
-      render_pca_contour(pca_scores_ref(), "PC2", "PC3", "PC2 vs PC3", uploaded_pca_scores())
+      render_pca_contour(pca_scores_ref(), "PC2", "PC3", "PC2 vs PC3", uploaded_pca_scores(), source_id = "pca_plot_23")
     })
+
+    # ============================================================================
+    # Spectra Downloads
+    # ============================================================================
+
+    output$download_raw <- downloadHandler(
+      filename = function() {
+        paste0("raw_spectra_resampled_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        req(uploaded_spectra_resampled_df())
+        fwrite(uploaded_spectra_resampled_df(), file)
+      },
+      contentType = "text/csv"
+    )
+
+    output$download_deriv <- downloadHandler(
+      filename = function() {
+        paste0("derivative_spectra_resampled_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        req(uploaded_spectra_resampled_df_sg())
+        fwrite(uploaded_spectra_resampled_df_sg(), file)
+      },
+      contentType = "text/csv"
+    )
   })
 }
