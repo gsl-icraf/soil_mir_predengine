@@ -139,7 +139,7 @@ body {
 /* Banner container with enhanced spectra background */
 .hero-banner {
   position: relative;
-  height: 60vh;
+  height: 30vh;
   min-height: 400px;
   display: flex;
   align-items: center;
@@ -160,7 +160,7 @@ body {
   object-fit: cover;
   object-position: center center;
   z-index: 0;
-  opacity: 0.9;
+  opacity: 0.2;
   transition: all 0.5s ease;
   animation: slowZoom 20s ease-in-out infinite;
 }
@@ -224,7 +224,7 @@ body {
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: px solid rgba(255, 255, 255, 0.3);
   border-top: 1px solid rgba(218, 165, 32, 0.3);
   border-radius: 16px;
   padding: 3rem 2.5rem;
@@ -245,12 +245,12 @@ body {
   font-size: 6rem;
   font-family: Roboto;
   font-weight: 700;
-  background: linear-gradient(135deg, 
-    var(--clay) 0%,
-    var(--rust) 25%,
-    var(--ochre) 50%,
-    var(--sage) 75%,
-    #FFFFFF 100%
+  background: linear-gradient(90deg, 
+    var(--clay) 25%,
+    var(--rust) 50%,
+    var(--ochre) 75%,
+    var(--sage) 100%,
+    #212121 100%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
