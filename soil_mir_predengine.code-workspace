@@ -2,11 +2,7 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../../modeling/julia_mir"
 		}
 	],
-	"settings": {
-	}
+	"settings": {}
 }
