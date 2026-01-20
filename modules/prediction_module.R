@@ -140,29 +140,46 @@ prediction_ui <- function(id) {
         title = list(icon("table"), "Prediction Results"),
         value = "results",
         card_body(
-          # Results table card
+          # Results table and texture triangle layout
           div(
             class = "mb-4",
-            card(
-              class = "spectral-card",
-              card_header(
-                div(
-                  class = "d-flex justify-content-between align-items-center",
-                  span(list(icon("table"), " Prediction Results")),
+            layout_columns(
+              col_widths = c(8, 4),
+
+              # Left: Results table card
+              card(
+                class = "spectral-card",
+                card_header(
                   div(
-                    class = "d-flex align-items-center gap-3",
-                    uiOutput(ns("prediction_count_display")),
-                    downloadButton(
-                      ns("download_predictions"),
-                      label = list(icon("download"), " Download Results (CSV)"),
-                      class = "btn-success btn-xs"
+                    class = "d-flex justify-content-between align-items-center",
+                    span(list(icon("table"), " Prediction Results")),
+                    div(
+                      class = "d-flex align-items-center gap-3",
+                      uiOutput(ns("prediction_count_display")),
+                      downloadButton(
+                        ns("download_predictions"),
+                        label = list(icon("download"), " Download Results (CSV)"),
+                        class = "btn-success btn-xs"
+                      )
                     )
-                  )
+                  ),
+                  class = "bg-gradient text-white"
                 ),
-                class = "bg-gradient text-white"
+                card_body(
+                  DT::dataTableOutput(ns("prediction_table"))
+                )
               ),
-              card_body(
-                DT::dataTableOutput(ns("prediction_table"))
+
+              # Right: Texture triangle card
+              card(
+                class = "spectral-card",
+                card_header(
+                  icon("layer-group"), " Soil Texture Triangle",
+                  class = "bg-gradient text-white"
+                ),
+                card_body(
+                  plotlyOutput(ns("texture_triangle_plot"), height = "400px")
+                )
               )
             )
           ),
@@ -928,6 +945,190 @@ prediction_server <- function(id) {
         selected_row_values(NULL)
       }
     })
+
+    # Texture triangle plot (Plotly ternary)
+    output$texture_triangle_plot <- renderPlotly({
+      req(prediction_results())
+
+      # Prepare data for texture triangle
+      predictions <- prediction_results()
+
+      # Calculate Silt % (assuming Clay + Sand + Silt = 100)
+      texture_data <- data.frame(
+        Sample_ID = predictions$Sample_ID,
+        Clay = predictions$`Clay_%`,
+        Sand = predictions$`Sand_%`,
+        Silt = 100 - predictions$`Clay_%` - predictions$`Sand_%`
+      )
+
+      # Remove any rows with negative silt or NA values
+      texture_data <- texture_data[texture_data$Silt >= 0 &
+        !is.na(texture_data$Clay) &
+        !is.na(texture_data$Sand) &
+        !is.na(texture_data$Silt), ]
+
+      if (nrow(texture_data) == 0) {
+        # Return empty plotly if no valid data
+        return(plot_ly() |>
+          layout(
+            title = list(text = "No valid texture data to display", font = list(color = "white")),
+            paper_bgcolor = "#2d2d2d",
+            plot_bgcolor = "#2d2d2d"
+          ))
+      }
+
+      # USDA texture class boundaries for plotly
+      # Define boundaries for each class as separate traces
+      usda_classes <- list(
+        list(name = "Clay", a = c(0, 45, 45, 0, 0), b = c(40, 40, 55, 100, 40), c = c(60, 15, 0, 0, 60)),
+        list(name = "Silty Clay", a = c(0, 0, 20, 20, 0), b = c(40, 60, 60, 40, 40), c = c(60, 40, 20, 40, 60)),
+        list(name = "Sandy Clay", a = c(45, 65, 65, 45, 45), b = c(35, 35, 55, 55, 35), c = c(20, 0, -20, 0, 20)),
+        list(name = "Clay Loam", a = c(20, 45, 52, 52, 20, 20), b = c(27, 27, 35, 40, 40, 27), c = c(53, 28, 13, 8, 40, 53)),
+        list(name = "Silty Clay Loam", a = c(0, 20, 20, 0, 0, 0), b = c(27, 27, 40, 40, 27, 27), c = c(73, 53, 40, 60, 73, 73)),
+        list(name = "Sandy Clay Loam", a = c(45, 52, 80, 80, 45, 45), b = c(20, 20, 27, 35, 35, 20), c = c(35, 28, -7, -15, 20, 35)),
+        list(name = "Loam", a = c(23, 52, 52, 43, 23, 23), b = c(7, 7, 20, 27, 27, 7), c = c(70, 41, 28, 30, 50, 70)),
+        list(name = "Silt Loam", a = c(0, 20, 50, 50, 0, 0), b = c(0, 0, 12, 27, 27, 0), c = c(100, 80, 38, 23, 73, 100)),
+        list(name = "Sandy Loam", a = c(43, 52, 85, 85, 43, 43), b = c(0, 7, 7, 15, 15, 0), c = c(57, 41, 8, 0, 42, 57)),
+        list(name = "Loamy Sand", a = c(70, 85, 90, 70, 70), b = c(0, 0, 15, 15, 0), c = c(30, 15, -5, 15, 30)),
+        list(name = "Sand", a = c(85, 90, 100, 85, 85), b = c(0, 0, 10, 10, 0), c = c(15, 10, -10, 5, 15)),
+        list(name = "Silt", a = c(0, 0, 20, 0, 0), b = c(0, 12, 12, 0, 0), c = c(100, 88, 68, 100, 100))
+      )
+
+      # Create plotly ternary plot
+      p <- plot_ly()
+
+      # Add USDA classification boundaries (very subtle)
+      for (class_info in usda_classes) {
+        p <- p |> add_trace(
+          type = "scatterternary",
+          mode = "lines",
+          a = class_info$a,
+          b = class_info$b,
+          c = class_info$c,
+          line = list(color = "rgba(128, 128, 128, 0.25)", width = 0.5),
+          hoverinfo = "text",
+          text = class_info$name,
+          showlegend = FALSE,
+          name = class_info$name
+        )
+      }
+
+      # Add class labels (positioned at centroids)
+      class_labels <- data.frame(
+        a = c(92, 80, 55, 35, 10, 8, 25, 65, 55, 20, 8, 15),
+        b = c(5, 10, 8, 18, 15, 34, 34, 28, 42, 50, 50, 60),
+        c = c(3, 10, 37, 47, 75, 58, 32, 7, 3, 30, 42, 25),
+        label = c(
+          "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam",
+          "Silt", "Silty Clay Loam", "Sandy Clay Loam", "Sandy Clay",
+          "Clay Loam", "Silty Clay", "Clay"
+        )
+      )
+
+      p <- p |> add_trace(
+        type = "scatterternary",
+        mode = "text",
+        a = class_labels$a,
+        b = class_labels$b,
+        c = class_labels$c,
+        text = class_labels$label,
+        textfont = list(color = "rgba(160, 160, 160, 0.4)", size = 9, family = "Poppins"),
+        hoverinfo = "skip",
+        showlegend = FALSE
+      )
+
+      # Add data points
+      p <- p |> add_trace(
+        type = "scatterternary",
+        mode = "markers",
+        a = texture_data$Sand,
+        b = texture_data$Clay,
+        c = texture_data$Silt,
+        text = ~ paste0(
+          "<b>", texture_data$Sample_ID, "</b><br>",
+          "Sand: ", round(texture_data$Sand, 1), "%<br>",
+          "Clay: ", round(texture_data$Clay, 1), "%<br>",
+          "Silt: ", round(texture_data$Silt, 1), "%"
+        ),
+        hoverinfo = "text",
+        marker = list(
+          size = 8,
+          color = "#00ff88",
+          opacity = 0.7,
+          line = list(color = "#00ff88", width = 1)
+        ),
+        showlegend = FALSE,
+        name = "Samples"
+      )
+
+      # Highlight selected row if any
+      selected_values <- selected_row_values()
+      if (!is.null(selected_values)) {
+        selected_silt <- 100 - selected_values$`Clay_%` - selected_values$`Sand_%`
+
+        if (selected_silt >= 0 && !is.na(selected_values$`Clay_%`)) {
+          p <- p |> add_trace(
+            type = "scatterternary",
+            mode = "markers",
+            a = selected_values$`Sand_%`,
+            b = selected_values$`Clay_%`,
+            c = selected_silt,
+            text = ~ paste0(
+              "<b>SELECTED: ", selected_values$Sample_ID, "</b><br>",
+              "Sand: ", round(selected_values$`Sand_%`, 1), "%<br>",
+              "Clay: ", round(selected_values$`Clay_%`, 1), "%<br>",
+              "Silt: ", round(selected_silt, 1), "%"
+            ),
+            hoverinfo = "text",
+            marker = list(
+              size = 14,
+              color = "orange",
+              opacity = 1,
+              line = list(color = "white", width = 2)
+            ),
+            showlegend = FALSE,
+            name = "Selected"
+          )
+        }
+      }
+
+      # Configure layout
+      p <- p |> layout(
+        ternary = list(
+          sum = 100,
+          aaxis = list(
+            title = list(text = "Sand %", font = list(color = "white", size = 12)),
+            tickfont = list(color = "white", size = 10),
+            gridcolor = "rgba(128, 128, 128, 0.3)",
+            linecolor = "white"
+          ),
+          baxis = list(
+            title = list(text = "Clay %", font = list(color = "white", size = 12)),
+            tickfont = list(color = "white", size = 10),
+            gridcolor = "rgba(128, 128, 128, 0.3)",
+            linecolor = "white"
+          ),
+          caxis = list(
+            title = list(text = "Silt %", font = list(color = "white", size = 12)),
+            tickfont = list(color = "white", size = 10),
+            gridcolor = "rgba(128, 128, 128, 0.3)",
+            linecolor = "white"
+          ),
+          bgcolor = "#1a1a1a"
+        ),
+        paper_bgcolor = "#2d2d2d",
+        plot_bgcolor = "#2d2d2d",
+        hoverlabel = list(
+          bgcolor = "#1a1a1a",
+          font = list(color = "white", size = 12, family = "Poppins"),
+          bordercolor = "#00ff88"
+        ),
+        margin = list(l = 50, r = 50, t = 50, b = 50)
+      )
+
+      p
+    })
+
 
     # PCA model
     pca_model <- reactive({
