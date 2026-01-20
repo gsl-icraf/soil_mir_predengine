@@ -27,7 +27,7 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     list_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK")
 
     for (soilvar in list_soilvars) {
-        if (!file.exists(paste0("models/", soilvar, "_model_ranger_rf.rds"))) {
+        if (!file.exists(paste0("models/", soilvar, "_model_ranger_rf.qs"))) {
             stop(paste("Model file for", soilvar, "not found. Please ensure the model exists in the 'models' directory."))
         }
         #rf_mod <- readRDS(paste0("models/", soilvar, "_model_ranger_rf.rds"))

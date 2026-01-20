@@ -20,7 +20,7 @@ WORKDIR /shiny/dashboard
 COPY . .
  
 # Application packages
-RUN Rscript -e "install.packages(c('shiny', 'bslib', 'data.table', 'plotly', 'shinyjs', 'remotes', 'mirai', 'prospectr', 'DT', 'ranger', 'htmltools', 'viridis'), repos='https://cran.rstudio.com')"
+RUN Rscript -e "install.packages(c('shiny', 'bslib', 'data.table', 'plotly', 'shinyjs', 'remotes', 'mirai', 'prospectr', 'DT', 'ranger', 'htmltools', 'viridis', 'qs'), repos='https://cran.rstudio.com')"
 
 RUN Rscript -e "remotes::install_github('spectral-cockpit/opusreader2')"
 
