@@ -4,28 +4,27 @@ library(bslib)
 library(data.table)
 library(plotly)
 library(shinyjs)
-library(opusreader2)
+library(opusreader)
 library(mirai)
 library(prospectr)
 library(DT)
 library(ranger)
 library(mirai)
+library(qs)
+library(viridis)
 
 
 # Source module files
 source("modules/home_module.R")
 source("modules/prediction_module.R")
+source("modules/instructions_module.R")
 
 # Set maximum upload size to 50 MB
 options(shiny.maxRequestSize = 50 * 1024^2)
 # Mirai daemons
 daemons(n = 2L, dispatcher = TRUE)
-# Processing and prediction function
-source("src/spectra_process_predict.R")
-
 # Source prediction processing function
 source("src/spectra_process_predict.R")
-##
 options(shiny.maxRequestSize = 50 * 1024^2)
 # Define UI with URL-aware navigation
 ui <- function(request) {
@@ -52,7 +51,7 @@ ui <- function(request) {
 
     # Initialize shinyjs
     useShinyjs(),
-    
+
     # Hidden input to store current page (helps with initialization)
     tags$input(id = "current_page", type = "hidden", value = url_path),
 
@@ -60,78 +59,78 @@ ui <- function(request) {
     tags$script(HTML('
       // Global variable to track current page
       window.currentPage = null;
-      
+
       // Determine page from URL immediately
       function getPageFromURL() {
         var urlParams = new URLSearchParams(window.location.search);
         return urlParams.get("page") || "home";
       }
-      
+
       // Set the current page immediately
       window.currentPage = getPageFromURL();
-      
+
       // Initialize routing system
       $(document).ready(function() {
         initializeRouting();
       });
-      
+
       function initializeRouting() {
         var initialPage = getPageFromURL();
         window.currentPage = initialPage;
-        
+
         console.log("Initializing routing:", {
           initialPage: initialPage,
           fullUrl: window.location.href
         });
-        
+
         // Set initial active navigation
         updateActiveNavigation(initialPage);
-        
+
         // Set the hidden input value
         $("#current_page").val(initialPage);
-        
+
         // Ensure Shiny knows the current page (with delay to ensure Shiny is ready)
         setTimeout(function() {
           Shiny.setInputValue("current_page", initialPage, {priority: "event"});
         }, 100);
       }
-      
+
       function updateActiveNavigation(page) {
         $(".nav-link").removeClass("active");
         $(".nav-link[data-page=\\"" + page + "\\"]").addClass("active");
       }
-      
+
       // Handle navigation clicks
       $(document).on("click", ".nav-link", function(e) {
         e.preventDefault();
         var page = $(this).data("page");
         window.currentPage = page;
-        
+
         // Update URL
         var newUrl = window.location.pathname + "?page=" + page;
         window.history.pushState({page: page}, null, newUrl);
-        
+
         // Update hidden input
         $("#current_page").val(page);
-        
+
         // Update Shiny
         Shiny.setInputValue("current_page", page, {priority: "event"});
-        
+
         // Update navigation
         updateActiveNavigation(page);
       });
-      
+
       // Handle browser back/forward buttons
       window.addEventListener("popstate", function(event) {
         var page = getPageFromURL();
         window.currentPage = page;
-        
+
         // Update hidden input
         $("#current_page").val(page);
-        
+
         // Update Shiny
         Shiny.setInputValue("current_page", page, {priority: "event"});
-        
+
         // Update navigation
         updateActiveNavigation(page);
       });
@@ -164,6 +163,12 @@ ui <- function(request) {
             href = "?page=prediction",
             `data-page` = "prediction",
             icon("chart-line"), " Prediction Engine"
+          ),
+          a(
+            class = "nav-link",
+            href = "?page=instructions",
+            `data-page` = "instructions",
+            icon("info-circle"), " Instructions"
           )
         )
       )
@@ -189,6 +194,15 @@ ui <- function(request) {
           class = "router-page",
           prediction_ui("prediction")
         )
+      ),
+
+      # Instructions content
+      conditionalPanel(
+        condition = "input.current_page == 'instructions' || (typeof input.current_page === 'undefined' && window.currentPage === 'instructions')",
+        div(
+          class = "router-page",
+          instructions_ui("instructions")
+        )
       )
     )
   )
@@ -209,6 +223,7 @@ server <- function(input, output, session) {
   # Module servers
   home_server("home")
   prediction_server("prediction")
+  instructions_server("instructions")
 }
 
 # Run the application

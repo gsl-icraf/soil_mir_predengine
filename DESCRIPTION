@@ -1,0 +1,16 @@
+Type: Shiny
+Title: Soil MIR Prediction Engine
+Additional_repositories: https://spectral-cockpit.r-universe.dev
+Imports:
+    shiny,
+    bslib,
+    data.table,
+    plotly,
+    shinyjs,
+    opusreader2,
+    mirai,
+    prospectr,
+    DT,
+    ranger,
+    qs,
+    viridis
