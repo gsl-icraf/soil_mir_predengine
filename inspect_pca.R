@@ -1,4 +1,4 @@
-mod <- readRDS("models/mir_pca_model.rds")
+mod <- readRDS("pca_model/mir_pca_model.rds")
 cat("Class:", class(mod), "\n")
 if (inherits(mod, "prcomp")) {
     cat("Rotation dimensions:", dim(mod$rotation), "\n")

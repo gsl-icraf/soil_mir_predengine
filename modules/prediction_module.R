@@ -931,7 +931,7 @@ prediction_server <- function(id) {
 
     # PCA model
     pca_model <- reactive({
-      readRDS("models/mir_pca_model.rds")
+      readRDS("pca_model/mir_pca_model.rds")
     })
 
     # Load PCA scores data
