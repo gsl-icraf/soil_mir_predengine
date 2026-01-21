@@ -2,14 +2,7 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../../modeling/julia_mir"
 		}
 	],
-	"settings": {
-		"workbench.colorCustomizations": {
-			"activityBar.background": "#493a55"
-		}
-	}
+	"settings": {}
 }

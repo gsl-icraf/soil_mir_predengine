@@ -7,7 +7,7 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
 
     ## Reference bands for resampling
-    wavebands_ref <- read.table("data/wavebands.txt", header = FALSE)
+    wavebands_ref <- read.table(file.path("data", "wavebands.txt"), header = FALSE)
     wavebands_ref <- as.numeric(wavebands_ref$V1)
 
     # Select bands between 607 nm and 4001 cm-1
@@ -31,10 +31,11 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     list_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK")
 
     for (soilvar in list_soilvars) {
-        if (!file.exists(paste0("models/", soilvar, "_model_ranger_rf.qs"))) {
+        model_path <- file.path("models", paste0(soilvar, "_model_ranger_rf.qs"))
+        if (!file.exists(model_path)) {
             stop(paste("Model file for", soilvar, "not found. Please ensure the model exists in the 'models' directory."))
         }
-        rf_mod <- qs::qread(paste0("models/", soilvar, "_model_ranger_rf.qs"))
+        rf_mod <- qs::qread(model_path)
         predictions <- round(ranger:::predict.ranger(rf_mod, data = spectra_mir_sel_resampled_sg)$predictions, 2)
         results_df[[soilvar]] <- predictions
     }
