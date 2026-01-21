@@ -1132,12 +1132,12 @@ prediction_server <- function(id) {
 
     # PCA model
     pca_model <- reactive({
-      readRDS("pca_model/mir_pca_model.rds")
+      readRDS(file.path("pca_model", "mir_pca_model.rds"))
     })
 
     # Load PCA scores data
     pca_scores_ref <- reactive({
-      fread("data/mir_pca_scores_5comp.csv")
+      fread(file.path("data", "mir_pca_scores_5comp.csv"))
     })
 
     # Projected scores for uploaded data
@@ -1153,7 +1153,7 @@ prediction_server <- function(id) {
       spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
 
       # 3. Reference bands for resampling
-      wavebands_ref <- read.table("data/wavebands.txt", header = FALSE)
+      wavebands_ref <- read.table(file.path("data", "wavebands.txt"), header = FALSE)
       wavebands_ref <- as.numeric(wavebands_ref$V1)
 
       # Wavelength selection
