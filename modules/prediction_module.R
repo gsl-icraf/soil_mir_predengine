@@ -596,7 +596,7 @@ prediction_server <- function(id) {
             setProgress(1, detail = "Complete!")
           })
 
-          showNotification(paste("Successfully processed", length(unique(uploaded_spectra$SSN)), "spectral files!"), type = "success")
+          showNotification(paste("Successfully processed", length(unique(uploaded_spectra$SSN)), "spectral files!"), type = "message")
 
           # Clean up temp directory
           unlink(extract_dir, recursive = TRUE)
@@ -661,7 +661,7 @@ prediction_server <- function(id) {
           shinyjs::html("predict_btn", paste(icon("flask"), " Predict Soil Properties"))
           showNotification(
             paste("✅ Prediction completed successfully for", nrow(predictions), "samples!"),
-            type = "success",
+            type = "message",
             duration = 5
           )
         },
