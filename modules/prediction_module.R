@@ -46,7 +46,9 @@ prediction_ui <- function(id) {
                       uiOutput(ns("spectra_count_display"), style = "color: #00ff88; font-weight: bold; font-size: 1.1em;")
                     )
                   )
-                )
+                ),
+                # Unzip progress bar
+                uiOutput(ns("unzip_progress_bar"))
               ),
 
               # Helpful message before unzipping
@@ -98,7 +100,12 @@ prediction_ui <- function(id) {
                   actionButton(ns("reset_plots"), "Reset View", class = "btn-xs btn-outline-light", style = "font-size: 0.75rem; padding: 0.2rem 0.5rem;")
                 )
               ),
-              plotlyOutput(ns("spectral_plot_combined"), height = "300px"),
+              shinycssloaders::withSpinner(
+                plotlyOutput(ns("spectral_plot_combined"), height = "300px"),
+                type = 6,
+                color = "#00ff88",
+                size = 0.8
+              ),
               conditionalPanel(
                 condition = "output.spectra_ready == true",
                 ns = ns,
@@ -506,72 +513,90 @@ prediction_server <- function(id) {
           extract_dir <- tempfile()
           dir.create(extract_dir)
 
-          # Unzip contents
-          unzip(zip_path, exdir = extract_dir)
+          # Show progress for unzipping (centered modal)
+          withProgress(message = "Unzipping files...", value = 0, style = "notification", {
+            # Unzip contents
+            unzip(zip_path, exdir = extract_dir)
+            incProgress(0.2, detail = "Scanning for spectral files...")
 
-          # Find .0 files (Opus binary format)
-          opus_files <- list.files(extract_dir, pattern = "*.0", full.names = TRUE, recursive = TRUE)
+            # Find .0 files (Opus binary format)
+            opus_files <- list.files(extract_dir, pattern = "*.0", full.names = TRUE, recursive = TRUE)
 
-          if (length(opus_files) == 0) {
-            showNotification("No Opus files (*.0) found in the ZIP archive.", type = "warning")
-            return()
-          }
+            if (length(opus_files) == 0) {
+              showNotification("No Opus files (*.0) found in the ZIP archive.", type = "warning")
+              return()
+            }
 
-          showNotification(paste("Processing", length(opus_files), "spectral files..."), type = "message")
+            incProgress(0.1, detail = paste("Found", length(opus_files), "files"))
 
-          # Process uploaded spectral data
-          opus_file <- opus_files[1]
-          s <- opus_read(opus_file)
-          uploaded_spectra <- cbind(s$metadata$sample_id, s$spec)
+            # Process uploaded spectral data
+            opus_file <- opus_files[1]
+            s <- opus_read(opus_file)
+            uploaded_spectra <- cbind(s$metadata$sample_id, s$spec)
 
-          ## Load additional files
-          for (i in 2:length(opus_files)) {
-            opus_file <- opus_files[i]
-            s_add <- opus_read(opus_file)
-            s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
-            uploaded_spectra <- rbind(uploaded_spectra, s_add)
-          }
+            ## Load additional files with progress
+            total_files <- length(opus_files)
+            for (i in 2:total_files) {
+              opus_file <- opus_files[i]
+              s_add <- opus_read(opus_file)
+              s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
+              uploaded_spectra <- rbind(uploaded_spectra, s_add)
 
-          uploaded_spectra <- data.table(uploaded_spectra)
-          uploaded_spectra[, SSN := V1]
-          cols_to_convert <- names(uploaded_spectra)[-which(names(uploaded_spectra) == "SSN")]
-          uploaded_spectra <- uploaded_spectra[, (cols_to_convert) := lapply(.SD, as.numeric), .SDcols = cols_to_convert]
-          uploaded_spectral_df <- uploaded_spectra[, lapply(.SD, mean), by = SSN, .SDcols = cols_to_convert]
+              # Update progress every 10 files or at the end
+              if (i %% 10 == 0 || i == total_files) {
+                incProgress(0.5 / total_files * 10,
+                  detail = paste("Processing file", i, "of", total_files)
+                )
+              }
+            }
 
-          # uploaded_spectra <- read_opus(opus_files, parallel = TRUE)
+            incProgress(0.1, detail = "Finalizing data...")
 
-          if (length(uploaded_spectra) == 0) {
-            showNotification("Failed to read spectral data from uploaded files.", type = "error")
-            return()
-          }
+            uploaded_spectra <- data.table(uploaded_spectra)
+            uploaded_spectra[, SSN := V1]
+            cols_to_convert <- names(uploaded_spectra)[-which(names(uploaded_spectra) == "SSN")]
+            uploaded_spectra <- uploaded_spectra[, (cols_to_convert) := lapply(.SD, as.numeric), .SDcols = cols_to_convert]
+            uploaded_spectral_df <- uploaded_spectra[, lapply(.SD, mean), by = SSN, .SDcols = cols_to_convert]
 
-          # # Process the uploaded spectra similar to sample data
-          # uploaded_spectra_names <- names(uploaded_spectra)
-          uploaded_wavelengths <- colnames(uploaded_spectral_df)[2:ncol(uploaded_spectral_df)]
-          # uploaded_absorbance_values <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-          # uploaded_ssn_absorbance_values <- c(uploaded_spectra[[uploaded_spectra_names[1]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values)
+            # uploaded_spectra <- read_opus(opus_files, parallel = TRUE)
 
-          # # Combine all uploaded spectra
-          # for (i in 2:length(uploaded_spectra)) {
-          #   uploaded_absorbance_values_add <- uploaded_spectra[[uploaded_spectra_names[i]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-          #   uploaded_ssn_absorbance_values_add <- c(uploaded_spectra[[uploaded_spectra_names[i]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values_add)
-          #   uploaded_ssn_absorbance_values <- rbind(uploaded_ssn_absorbance_values, uploaded_ssn_absorbance_values_add)
-          # }
+            if (length(uploaded_spectra) == 0) {
+              showNotification("Failed to read spectral data from uploaded files.", type = "error")
+              return()
+            }
 
-          # uploaded_spectral_df <- data.table(uploaded_ssn_absorbance_values)
-          colnames(uploaded_spectral_df) <- c("SSN", as.character(uploaded_wavelengths))
-          uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)] <- lapply(uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], as.numeric)
+            # # Process the uploaded spectra similar to sample data
+            # uploaded_spectra_names <- names(uploaded_spectra)
+            uploaded_wavelengths <- colnames(uploaded_spectral_df)[2:ncol(uploaded_spectral_df)]
+            # uploaded_absorbance_values <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
+            # uploaded_ssn_absorbance_values <- c(uploaded_spectra[[uploaded_spectra_names[1]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values)
 
-          # Calculate 1st derivatives
-          uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
+            # # Combine all uploaded spectra
+            # for (i in 2:length(uploaded_spectra)) {
+            #   uploaded_absorbance_values_add <- uploaded_spectra[[uploaded_spectra_names[i]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
+            #   uploaded_ssn_absorbance_values_add <- c(uploaded_spectra[[uploaded_spectra_names[i]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values_add)
+            #   uploaded_ssn_absorbance_values <- rbind(uploaded_ssn_absorbance_values, uploaded_ssn_absorbance_values_add)
+            # }
 
-          # Store processed data in reactive values
-          uploaded_spectra_df(uploaded_spectral_df)
-          uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
-          spectra_count(length(unique(uploaded_spectra$SSN)))
-          spectra_processed(TRUE) # Enable predict button
+            # uploaded_spectral_df <- data.table(uploaded_ssn_absorbance_values)
+            colnames(uploaded_spectral_df) <- c("SSN", as.character(uploaded_wavelengths))
+            uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)] <- lapply(uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], as.numeric)
 
-          showNotification(paste("Successfully processed", length(uploaded_spectra), "spectral files!"), type = "success")
+            incProgress(0.1, detail = "Calculating derivatives...")
+
+            # Calculate 1st derivatives
+            uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
+
+            # Store processed data in reactive values
+            uploaded_spectra_df(uploaded_spectral_df)
+            uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
+            spectra_count(length(unique(uploaded_spectra$SSN)))
+            spectra_processed(TRUE) # Enable predict button
+
+            setProgress(1, detail = "Complete!")
+          })
+
+          showNotification(paste("Successfully processed", length(unique(uploaded_spectra$SSN)), "spectral files!"), type = "success")
 
           # Clean up temp directory
           unlink(extract_dir, recursive = TRUE)
@@ -1246,6 +1271,8 @@ prediction_server <- function(id) {
         ) |>
         config(displayModeBar = FALSE) |>
         event_register("plotly_click")
+
+      p
     }
 
     # Observe clicks on PCA plots

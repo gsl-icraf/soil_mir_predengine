@@ -1174,3 +1174,29 @@ body {
   padding-left: 0;
   list-style: none;
 }
+/* =========================================================================== */
+/* File Upload Progress Bar Styling */
+/* =========================================================================== */
+
+/* Make file upload progress bar larger and more visible */
+.shiny-file-input-progress {
+  height: 30px !important;
+  font-size: 16px !important;
+  line-height: 30px !important;
+}
+
+.shiny-file-input-progress .progress {
+  height: 30px !important;
+  margin-bottom: 10px !important;
+}
+
+.shiny-file-input-progress .progress-bar {
+  font-size: 16px !important;
+  line-height: 30px !important;
+  font-weight: 600 !important;
+}
+
+/* Add spacing between file input and progress bar */
+.shiny-input-container input[type="file"] {
+  margin-bottom: 15px !important;
+}

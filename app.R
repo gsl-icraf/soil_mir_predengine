@@ -13,6 +13,7 @@ library(mirai)
 library(qs)
 library(viridis)
 library(ggplot2)
+library(shinycssloaders)
 
 
 # Source module files
