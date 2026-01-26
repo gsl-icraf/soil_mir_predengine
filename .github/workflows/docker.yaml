@@ -13,6 +13,8 @@ jobs:
     steps:
     - name: checkout code from current repo main/master branch
       uses: actions/checkout@v3
+      with:
+        lfs: true
 
     - name: Set image meta attributes
       id: meta
