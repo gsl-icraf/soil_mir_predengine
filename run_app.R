@@ -21,7 +21,8 @@ required_packages <- c(
   "qs", # Fast serialization
   "remotes",
   "opusreader",
-  "arrow"
+  "arrow",
+  "brnn"
 )
 
 packages_from_github <- c(

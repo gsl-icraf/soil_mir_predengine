@@ -2,3 +2,5 @@
 models/*.rds
 models/*.qs
 shinyio_publish.R
+src/sandbox
+data/brnn*
