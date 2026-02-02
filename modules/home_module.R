@@ -39,6 +39,21 @@ home_ui <- function(id) {
       )
     ),
 
+    # Latest updates banner
+    div(
+      class = "alert alert-info d-flex align-items-center mt-3 mb-3",
+      style = "background-color: rgba(25, 135, 84, 0.5); border-color: rgba(25, 135, 84, 0.4); color: white;",
+      icon("bullhorn", class = "me-2", style = "font-size: 1.5em; color: black;"),
+      span(
+        tags$strong("Latest model update: 1/2/2026."),
+        style = "color: black;"
+      ),
+      br(),
+      span(" Fixed a bug in the scaling of uploaded spectra; updated models to use torch (Deep Neural Networks). This increases performance and accuracy. Added button to prediction page to reset session without downloading the results.",
+        style = "color: black;"
+      )
+    ),
+
     # Row of cards with key metrics/info - enhanced with spectral theme
     layout_columns(
       col_widths = c(4, 4, 4),

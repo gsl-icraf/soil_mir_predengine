@@ -22,7 +22,7 @@ required_packages <- c(
   "remotes",
   "opusreader",
   "arrow",
-  "brnn"
+  "torch"
 )
 
 packages_from_github <- c(
