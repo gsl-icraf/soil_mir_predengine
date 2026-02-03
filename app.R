@@ -19,6 +19,7 @@ library(shinycssloaders)
 source("modules/home_module.R")
 source("modules/prediction_module.R")
 source("modules/instructions_module.R")
+source("modules/property_info_module.R")
 
 # Set maximum upload size to 250 MB
 options(shiny.maxRequestSize = 250 * 1024^2)
@@ -167,9 +168,9 @@ ui <- function(request) {
           ),
           a(
             class = "nav-link",
-            href = "?page=instructions",
-            `data-page` = "instructions",
-            icon("info-circle"), " Instructions"
+            href = "?page=properties",
+            `data-page` = "properties",
+            icon("flask"), " Soil Properties"
           )
         )
       )
@@ -204,6 +205,15 @@ ui <- function(request) {
           class = "router-page",
           instructions_ui("instructions")
         )
+      ),
+
+      # Soil Properties content
+      conditionalPanel(
+        condition = "input.current_page == 'properties' || (typeof input.current_page === 'undefined' && window.currentPage === 'properties')",
+        div(
+          class = "router-page",
+          property_info_ui("properties")
+        )
       )
     )
   )
@@ -225,6 +235,7 @@ server <- function(input, output, session) {
   home_server("home")
   prediction_server("prediction")
   instructions_server("instructions")
+  property_info_server("properties")
 }
 
 # Run the application
