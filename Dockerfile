@@ -18,6 +18,10 @@ RUN apt-get update -y && apt-get install -y \
 WORKDIR /shiny/dashboard
  
 COPY . .
+
+RUN mv "/shiny/dashboard/pca_model/mir_pca_model " \
+       "/shiny/dashboard/pca_model/mir_pca_model.rds" 
+
  
 # Application packages
 
@@ -30,7 +34,7 @@ RUN Rscript -e "install.packages(c('shiny', 'bslib', 'data.table', 'plotly', 'sh
 RUN Rscript -e "torch::install_torch()"
 RUN Rscript -e "remotes::install_github(c('spectral-cockpit/opusreader2', 'pierreroudier/opusreader'))" 
 
-RUN mv pca_model/mir_pca_model\ pca_model/mir_pca_model.rds
+
 
 # Port
 EXPOSE 3838
