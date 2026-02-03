@@ -79,6 +79,10 @@ predict_torch <- function(model_path, new_data) {
                 pred_unscaled <- pred_unscaled^2
             }
 
+            if (!is.null(saved$target_scale) && saved$target_scale != 1) {
+                pred_unscaled <- pred_unscaled / saved$target_scale
+            }
+
             if (!is.null(saved$y_range)) {
                 pred_unscaled <- (pred_unscaled - 0.1) *
                     (saved$y_range$max - saved$y_range$min) / 0.8 +
@@ -152,6 +156,15 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         model_path <- sort(matched, decreasing = TRUE)[1]
         predictions <- round(predict_torch(model_path, spectra_mir_sel_resampled_sg), 2)
         results_df[[soilvar]] <- predictions
+    }
+
+    ## Sanity check: TN should be ~1/10 of SOC. If ratio is closer
+    ## to 1 than 0.1, the model likely lacks target_scale metadata
+    if ("TN" %in% names(results_df) && "SOC" %in% names(results_df)) {
+        ratio <- median(results_df$TN / results_df$SOC, na.rm = TRUE)
+        if (!is.na(ratio) && ratio > 0.5) {
+            results_df$TN <- round(results_df$TN / 10, 2)
+        }
     }
 
     ## Output spectra and SG derivatives with SSN
