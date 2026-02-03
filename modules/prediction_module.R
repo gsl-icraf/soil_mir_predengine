@@ -68,6 +68,28 @@ prediction_ui <- function(id) {
                 )
               ),
 
+              # Feature selection for prediction
+              conditionalPanel(
+                condition = "output.spectra_ready == true",
+                ns = ns,
+                div(
+                  class = "mt-3 p-3 rounded",
+                  style = "background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);",
+                  h6("Select properties to predict:", style = "color: white; font-weight: bold; font-size: 0.9em;"),
+                  checkboxGroupInput(
+                    ns("selected_properties"),
+                    label = NULL,
+                    choices = c(
+                      "SOC" = "SOC", "TN" = "TN", "pH" = "pH", "CEC" = "CEC",
+                      "Clay" = "clay", "Sand" = "sand", "ExCa" = "ExCa",
+                      "ExMg" = "ExMg", "ExK" = "ExK"
+                    ),
+                    selected = c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK"),
+                    inline = TRUE
+                  )
+                )
+              ),
+
               # Predict button with progress indicators (only show after unzipping)
               conditionalPanel(
                 condition = "output.spectra_ready == true",
@@ -167,6 +189,11 @@ prediction_ui <- function(id) {
                         ns("download_predictions"),
                         label = list(icon("download"), " Download Results (CSV)"),
                         class = "btn-success btn-xs"
+                      ),
+                      actionButton(
+                        ns("reset_session"),
+                        label = list(icon("rotate-left"), " New Session"),
+                        class = "btn-outline-warning btn-xs"
                       )
                     )
                   ),
@@ -382,7 +409,7 @@ prediction_server <- function(id) {
           plot_data <- spectral_df_sg_long
         }
         y_title <- "First Derivative"
-        plot_title <- "First Derivative Spectra"
+        plot_title <- ""
       } else {
         # Use original data
         if (!is.null(uploaded_spectra_df())) {
@@ -402,7 +429,7 @@ prediction_server <- function(id) {
           plot_data <- spectral_df_long
         }
         y_title <- "Absorbance"
-        plot_title <- "Original Spectra"
+        plot_title <- ""
       }
 
       # Create plasma-like color palette
@@ -519,8 +546,10 @@ prediction_server <- function(id) {
             unzip(zip_path, exdir = extract_dir)
             incProgress(0.2, detail = "Scanning for spectral files...")
 
-            # Find .0 files (Opus binary format)
-            opus_files <- list.files(extract_dir, pattern = "*.0", full.names = TRUE, recursive = TRUE)
+            # Find .0 files (Opus binary format), excluding macOS resource forks
+            opus_files <- list.files(extract_dir, pattern = "\\.0$", full.names = TRUE, recursive = TRUE)
+            opus_files <- opus_files[!grepl("__MACOSX", opus_files)]
+            opus_files <- opus_files[!grepl("/\\._", opus_files)]
 
             if (length(opus_files) == 0) {
               showNotification("No Opus files (*.0) found in the ZIP archive.", type = "warning")
@@ -530,57 +559,74 @@ prediction_server <- function(id) {
             incProgress(0.1, detail = paste("Found", length(opus_files), "files"))
 
             # Process uploaded spectral data
-            opus_file <- opus_files[1]
-            s <- opus_read(opus_file)
-            uploaded_spectra <- cbind(s$metadata$sample_id, s$spec)
-
-            ## Load additional files with progress
             total_files <- length(opus_files)
-            for (i in 2:total_files) {
-              opus_file <- opus_files[i]
-              s_add <- opus_read(opus_file)
-              s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
-              uploaded_spectra <- rbind(uploaded_spectra, s_add)
+            spectra_list <- vector("list", total_files)
+
+            for (i in seq_along(opus_files)) {
+              tryCatch(
+                {
+                  s <- opus_read(opus_files[i])
+                  dt <- data.table(cbind(s$metadata$sample_id, s$spec))
+                  spectra_list[[i]] <- dt
+                },
+                error = function(e) {
+                  warning(paste("Skipping file", basename(opus_files[i]), ":", e$message))
+                }
+              )
 
               # Update progress every 10 files or at the end
               if (i %% 10 == 0 || i == total_files) {
-                incProgress(0.5 / total_files * 10,
+                incProgress(0.5 / total_files * min(i, 10),
                   detail = paste("Processing file", i, "of", total_files)
                 )
               }
             }
 
+            # Combine spectra - use majority wavenumber layout, skip incompatible files
+            spectra_list <- spectra_list[!sapply(spectra_list, is.null)]
+
             incProgress(0.1, detail = "Finalizing data...")
 
-            uploaded_spectra <- data.table(uploaded_spectra)
-            uploaded_spectra[, SSN := V1]
-            cols_to_convert <- names(uploaded_spectra)[-which(names(uploaded_spectra) == "SSN")]
-            uploaded_spectra <- uploaded_spectra[, (cols_to_convert) := lapply(.SD, as.numeric), .SDcols = cols_to_convert]
-            uploaded_spectral_df <- uploaded_spectra[, lapply(.SD, mean), by = SSN, .SDcols = cols_to_convert]
-
-            # uploaded_spectra <- read_opus(opus_files, parallel = TRUE)
-
-            if (length(uploaded_spectra) == 0) {
+            if (length(spectra_list) == 0) {
               showNotification("Failed to read spectral data from uploaded files.", type = "error")
               return()
             }
 
-            # # Process the uploaded spectra similar to sample data
-            # uploaded_spectra_names <- names(uploaded_spectra)
-            uploaded_wavelengths <- colnames(uploaded_spectral_df)[2:ncol(uploaded_spectral_df)]
-            # uploaded_absorbance_values <- uploaded_spectra[[uploaded_spectra_names[1]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-            # uploaded_ssn_absorbance_values <- c(uploaded_spectra[[uploaded_spectra_names[1]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values)
+            # Identify the most common wavenumber layout
+            col_signatures <- sapply(spectra_list, function(dt) paste(ncol(dt), collapse = "_"))
+            layout_counts <- table(col_signatures)
+            majority_layout <- names(which.max(layout_counts))
+            keep_idx <- which(col_signatures == majority_layout)
 
-            # # Combine all uploaded spectra
-            # for (i in 2:length(uploaded_spectra)) {
-            #   uploaded_absorbance_values_add <- uploaded_spectra[[uploaded_spectra_names[i]]]$ab_no_atm_comp$data[1:length(uploaded_wavelengths)]
-            #   uploaded_ssn_absorbance_values_add <- c(uploaded_spectra[[uploaded_spectra_names[i]]]$basic_metadata$opus_sample_name, uploaded_absorbance_values_add)
-            #   uploaded_ssn_absorbance_values <- rbind(uploaded_ssn_absorbance_values, uploaded_ssn_absorbance_values_add)
-            # }
+            if (length(keep_idx) < length(spectra_list)) {
+              n_skipped <- length(spectra_list) - length(keep_idx)
+              showNotification(
+                paste0(
+                  n_skipped, " files skipped (different wavenumber layout from majority). ",
+                  "Keeping ", length(keep_idx), " files."
+                ),
+                type = "warning", duration = 8
+              )
+              spectra_list <- spectra_list[keep_idx]
+            }
 
-            # uploaded_spectral_df <- data.table(uploaded_ssn_absorbance_values)
-            colnames(uploaded_spectral_df) <- c("SSN", as.character(uploaded_wavelengths))
-            uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)] <- lapply(uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], as.numeric)
+            uploaded_spectra <- rbindlist(spectra_list)
+
+            if (nrow(uploaded_spectra) == 0) {
+              showNotification("Failed to read spectral data from uploaded files.", type = "error")
+              return()
+            }
+
+            uploaded_spectra[, SSN := V1]
+            uploaded_spectra[, V1 := NULL]
+            spectral_cols <- setdiff(names(uploaded_spectra), "SSN")
+            uploaded_spectra[, (spectral_cols) := lapply(.SD, as.numeric), .SDcols = spectral_cols]
+
+            # Sort spectral columns by descending wavenumber (opus native order, required for correct SG derivative sign)
+            spectral_cols <- spectral_cols[order(as.numeric(spectral_cols), decreasing = TRUE)]
+            setcolorder(uploaded_spectra, c("SSN", spectral_cols))
+
+            uploaded_spectral_df <- uploaded_spectra[, lapply(.SD, mean), by = SSN, .SDcols = spectral_cols]
 
             incProgress(0.1, detail = "Calculating derivatives...")
 
@@ -639,7 +685,10 @@ prediction_server <- function(id) {
           cat("Input data dimensions:", nrow(uploaded_spectra_df()), "x", ncol(uploaded_spectra_df()), "\n")
 
           # Call the actual prediction function
-          results <- process_spectra_predict(spectra_mir = uploaded_spectra_df())
+          results <- process_spectra_predict(
+            spectra_mir = uploaded_spectra_df(),
+            selected_vars = input$selected_properties
+          )
           predictions <- results$predictions
 
           # Store resampled data for downloads
@@ -648,11 +697,42 @@ prediction_server <- function(id) {
 
           cat("Prediction completed. Output dimensions:", nrow(predictions), "x", ncol(predictions), "\n")
 
-          # Rename columns for better display
-          colnames(predictions) <- c(
-            "Sample_ID", "SOC_g/kg", "TN_g/kg", "pH", "CEC_cmolc/kg",
-            "Clay_%", "Sand_%", "ExCa_cmolc/kg", "ExMg_cmolc/kg", "ExK_cmolc/kg"
+          # Dynamic column renaming based on selected properties
+          all_units <- c(
+            "SOC" = "g_kg", "TN" = "g_kg", "pH" = "", "CEC" = "cmolc_kg",
+            "clay" = "%", "sand" = "%", "ExCa" = "cmolc_kg", "ExMg" = "cmolc_kg", "ExK" = "cmolc_kg"
           )
+
+          all_display_names <- c(
+            "SOC" = "SOC", "TN" = "TN", "pH" = "pH", "CEC" = "CEC",
+            "clay" = "Clay", "sand" = "Sand", "ExCa" = "ExCa", "ExMg" = "ExMg", "ExK" = "ExK"
+          )
+
+          new_colnames <- c("SSN")
+          for (var in input$selected_properties) {
+            if (var %in% names(all_units)) {
+              unit <- all_units[var]
+              display_name <- all_display_names[var]
+              col_name <- if (unit != "") paste0(display_name, " (", unit, ")") else display_name
+              new_colnames <- c(new_colnames, col_name)
+            }
+          }
+
+          # Handle cases where some models might have failed
+          actual_vars <- setdiff(colnames(predictions), "SSN")
+          final_colnames <- c("SSN")
+          for (var in actual_vars) {
+            if (var %in% names(all_units)) {
+              unit <- all_units[var]
+              display_name <- all_display_names[var]
+              col_name <- if (unit != "") paste0(display_name, " (", unit, ")") else display_name
+              final_colnames <- c(final_colnames, col_name)
+            } else {
+              final_colnames <- c(final_colnames, var)
+            }
+          }
+
+          colnames(predictions) <- final_colnames
 
           # Store results and update state
           prediction_results(predictions)
@@ -725,8 +805,8 @@ prediction_server <- function(id) {
         # Create density plots for soil properties
         predictions <- prediction_results()
 
-        # Define soil properties to plot (excluding Sample_ID)
-        soil_properties <- colnames(predictions)[-1] # Remove Sample_ID column
+        # Define soil properties to plot (excluding SSN)
+        soil_properties <- colnames(predictions)[-1] # Remove SSN column
         n_props <- length(soil_properties)
 
         # Set up multi-panel layout with more padding
@@ -892,6 +972,20 @@ prediction_server <- function(id) {
       contentType = "text/csv"
     )
 
+    # Reset session without downloading
+    observeEvent(input$reset_session, {
+      uploaded_spectra_df(NULL)
+      uploaded_spectra_df_sg(NULL)
+      uploaded_spectra_resampled_df(NULL)
+      uploaded_spectra_resampled_df_sg(NULL)
+      spectra_count(0)
+      prediction_results(NULL)
+      spectra_processed(FALSE)
+      prediction_loading(FALSE)
+      selected_row_values(NULL)
+      shinyjs::reset("spectra_file")
+      showNotification("Session reset. Ready for new upload.", type = "message")
+    })
 
     # Simple prediction status indicator - removed spinner
     output$prediction_spinner <- renderUI({
@@ -950,10 +1044,7 @@ prediction_server <- function(id) {
           rownames = FALSE
         ) |>
           DT::formatRound(
-            columns = c(
-              "SOC_g/kg", "TN_g/kg", "pH", "CEC_cmolc/kg",
-              "Clay_%", "Sand_%", "ExCa_cmolc/kg", "ExMg_cmolc/kg", "ExK_cmolc/kg"
-            ),
+            columns = setdiff(colnames(prediction_results()), "SSN"),
             digits = 3
           )
       },
@@ -975,15 +1066,26 @@ prediction_server <- function(id) {
     output$texture_triangle_plot <- renderPlotly({
       req(prediction_results())
 
-      # Prepare data for texture triangle
+      # Prepare data for texture triangle - only if both Clay and Sand are present
       predictions <- prediction_results()
 
-      # Calculate Silt % (assuming Clay + Sand + Silt = 100)
+      clay_col <- grep("Clay", colnames(predictions), value = TRUE)
+      sand_col <- grep("Sand", colnames(predictions), value = TRUE)
+
+      if (length(clay_col) == 0 || length(sand_col) == 0) {
+        return(plot_ly() |>
+          layout(
+            title = list(text = "Texture triangle requires both Clay and Sand predictions", font = list(color = "white", size = 12)),
+            paper_bgcolor = "#2d2d2d",
+            plot_bgcolor = "#2d2d2d"
+          ))
+      }
+
       texture_data <- data.frame(
-        Sample_ID = predictions$Sample_ID,
-        Clay = predictions$`Clay_%`,
-        Sand = predictions$`Sand_%`,
-        Silt = 100 - predictions$`Clay_%` - predictions$`Sand_%`
+        SSN = predictions$SSN,
+        Clay = predictions[[clay_col]],
+        Sand = predictions[[sand_col]],
+        Silt = 100 - predictions[[clay_col]] - predictions[[sand_col]]
       )
 
       # Remove any rows with negative silt or NA values
@@ -1070,7 +1172,7 @@ prediction_server <- function(id) {
         b = texture_data$Clay,
         c = texture_data$Silt,
         text = ~ paste0(
-          "<b>", texture_data$Sample_ID, "</b><br>",
+          "<b>", texture_data$SSN, "</b><br>",
           "Sand: ", round(texture_data$Sand, 1), "%<br>",
           "Clay: ", round(texture_data$Clay, 1), "%<br>",
           "Silt: ", round(texture_data$Silt, 1), "%"
@@ -1089,19 +1191,21 @@ prediction_server <- function(id) {
       # Highlight selected row if any
       selected_values <- selected_row_values()
       if (!is.null(selected_values)) {
-        selected_silt <- 100 - selected_values$`Clay_%` - selected_values$`Sand_%`
+        clay_val <- if (length(clay_col) > 0) as.numeric(selected_values[[clay_col]]) else NA
+        sand_val <- if (length(sand_col) > 0) as.numeric(selected_values[[sand_col]]) else NA
+        selected_silt <- 100 - clay_val - sand_val
 
-        if (selected_silt >= 0 && !is.na(selected_values$`Clay_%`)) {
+        if (!is.na(clay_val) && !is.na(sand_val) && selected_silt >= 0) {
           p <- p |> add_trace(
             type = "scatterternary",
             mode = "markers",
-            a = selected_values$`Sand_%`,
-            b = selected_values$`Clay_%`,
+            a = sand_val,
+            b = clay_val,
             c = selected_silt,
             text = ~ paste0(
-              "<b>SELECTED: ", selected_values$Sample_ID, "</b><br>",
-              "Sand: ", round(selected_values$`Sand_%`, 1), "%<br>",
-              "Clay: ", round(selected_values$`Clay_%`, 1), "%<br>",
+              "<b>SELECTED: ", selected_values$SSN, "</b><br>",
+              "Sand: ", round(sand_val, 1), "%<br>",
+              "Clay: ", round(clay_val, 1), "%<br>",
               "Silt: ", round(selected_silt, 1), "%"
             ),
             hoverinfo = "text",

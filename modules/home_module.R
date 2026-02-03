@@ -2,6 +2,8 @@
 home_ui <- function(id) {
   ns <- NS(id)
 
+  update_message <- "Fixed a bug in the scaling of uploaded spectra; updated models to use torch (Deep Neural Networks). This increases performance and accuracy. Added button to prediction page to reset session without downloading the results."
+
   tagList(
     # Hero banner with glassmorphism effect
     div(
@@ -36,6 +38,34 @@ home_ui <- function(id) {
           class = "banner-cta nav-link",
           `data-page` = "prediction"
         )
+      )
+    ),
+
+    # Latest updates banner
+    div(
+      class = "alert alert-info d-flex align-items-center mt-3 mb-3",
+      style = "background-color: rgba(25, 135, 84, 0.5); border-color: rgba(25, 135, 84, 0.4); color: white;",
+      icon("bullhorn", class = "me-2", style = "font-size: 1.5em; color: black;"),
+      span(
+        tags$strong("Latest model update: ", format(Sys.Date(), "%d/%m/%Y")),
+        style = "color: black;"
+      )
+    ),
+
+    # Featured Update Card
+    card(
+      class = "spectral-card mb-4",
+      style = "border-left: 5px solid #198754;",
+      card_header(
+        div(
+          class = "d-flex justify-content-between align-items-center",
+          span(icon("newspaper", class = "me-2"), "Latest Engine Enhancements"),
+          span(class = "badge bg-success", "New Release")
+        ),
+        class = "bg-gradient text-white"
+      ),
+      card_body(
+        p(update_message, class = "lead", style = "font-size: 1.1em; color: rgba(255,255,255,0.9);")
       )
     ),
 
