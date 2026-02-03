@@ -134,7 +134,8 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     results_df <- data.frame(SSN = spectra_mir$SSN)
 
     ## Map soil variables to their torch model files
-    all_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "silt", "ExCa", "ExMg", "ExK")
+    # Silt is now derived, so it's removed from modeled vars
+    all_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK")
 
     # Use selected variables if provided, otherwise use all
     list_soilvars <- if (is.null(selected_vars)) all_soilvars else selected_vars
@@ -158,8 +159,7 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         results_df[[soilvar]] <- predictions
     }
 
-    ## Sanity check: TN should be ~1/10 of SOC. If ratio is closer
-    ## to 1 than 0.1, the model likely lacks target_scale metadata
+    ## Sanity check: TN should be ~1/10 of SOC.
     if ("TN" %in% names(results_df) && "SOC" %in% names(results_df)) {
         ratio <- median(results_df$TN / results_df$SOC, na.rm = TRUE)
         if (!is.na(ratio) && ratio > 0.5) {
@@ -167,20 +167,31 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         }
     }
 
-    ## Texture closure: Ensure Clay + Sand + Silt = 100%
-    texture_vars <- c("clay", "sand", "silt")
-    present_texture <- intersect(texture_vars, names(results_df))
+    ## Texture derivation and closure
+    # silt = 100 - (clay + sand)
+    if ("clay" %in% names(results_df) && "sand" %in% names(results_df)) {
+        # 1. Clip Clay and Sand to [0, 100]
+        results_df$clay <- pmax(0, pmin(100, results_df$clay))
+        results_df$sand <- pmax(0, pmin(100, results_df$sand))
 
-    if (length(present_texture) == 3) {
-        # Perform closure across all three components
-        sums <- rowSums(results_df[, texture_vars, drop = FALSE], na.rm = TRUE)
-        # Avoid division by zero
-        valid_sums <- !is.na(sums) & sums > 0
-        if (any(valid_sums)) {
-            for (var in texture_vars) {
-                results_df[valid_sums, var] <- round(results_df[valid_sums, var] / sums[valid_sums] * 100, 2)
-            }
+        # 2. Check sum and scale if > 100
+        sums_cs <- results_df$clay + results_df$sand
+        over_100 <- sums_cs > 100 & !is.na(sums_cs)
+
+        if (any(over_100)) {
+            # Scale proportionally so clay + sand = 100
+            results_df$clay[over_100] <- (results_df$clay[over_100] / sums_cs[over_100]) * 100
+            results_df$sand[over_100] <- (results_df$sand[over_100] / sums_cs[over_100]) * 100
         }
+
+        # 3. Derive Silt
+        results_df$silt <- round(100 - (results_df$clay + results_df$sand), 2)
+        # Ensure rounding didn't push it slightly negative
+        results_df$silt <- pmax(0, results_df$silt)
+
+        # 4. Final rounding for all components
+        results_df$clay <- round(results_df$clay, 2)
+        results_df$sand <- round(results_df$sand, 2)
     }
 
     ## Output spectra and SG derivatives with SSN

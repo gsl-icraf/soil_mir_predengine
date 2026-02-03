@@ -81,10 +81,10 @@ prediction_ui <- function(id) {
                     label = NULL,
                     choices = c(
                       "SOC" = "SOC", "TN" = "TN", "pH" = "pH", "CEC" = "CEC",
-                      "Clay" = "clay", "Silt" = "silt", "Sand" = "sand", "ExCa" = "ExCa",
+                      "Clay" = "clay", "Sand" = "sand", "ExCa" = "ExCa",
                       "ExMg" = "ExMg", "ExK" = "ExK"
                     ),
-                    selected = c("SOC", "TN", "pH", "CEC", "clay", "silt", "sand", "ExCa", "ExMg", "ExK"),
+                    selected = c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK"),
                     inline = TRUE
                   )
                 )
@@ -242,7 +242,7 @@ prediction_ui <- function(id) {
               class = "bg-gradient text-white"
             ),
             card_body(
-              plotOutput(ns("prediction_plot"), height = "600px")
+              plotlyOutput(ns("prediction_plot"), height = "600px")
             )
           )
         )
@@ -328,23 +328,26 @@ prediction_server <- function(id) {
     # spectra <- read_opus(sample_spectra, parallel = TRUE)
 
     # Process uploaded spectral data
-    s <- opus_read(sample_spectra[1])
-    spectra <- cbind(s$metadata$sample_id, s$spec)
+    if (length(sample_spectra) > 0) {
+      s_list <- lapply(sample_spectra, function(f) {
+        s_res <- opus_read(f)
+        cbind(s_res$metadata$sample_id, s_res$spec)
+      })
+      spectra <- as.data.frame(do.call(rbind, s_list))
 
-    ## Load additional files
-    for (i in 2:length(sample_spectra)) {
-      opus_file <- sample_spectra[i]
-      s_add <- opus_read(opus_file)
-      s_add <- cbind(s_add$metadata$sample_id, s_add$spec)
-      spectra <- rbind(spectra, s_add)
+      spectral_df <- data.table(spectra)
+      setnames(spectral_df, old = colnames(spectral_df)[1], new = "SSN")
+
+      # Convert all spectral columns to numeric
+      spectral_cols <- colnames(spectral_df)[-1]
+      spectral_df[, (spectral_cols) := lapply(.SD, as.numeric), .SDcols = spectral_cols]
+
+      ## 1st derivatives
+      spectral_df_sg <- savitzkyGolay(X = spectral_df[, ..spectral_cols], p = 3, w = 11, m = 1)
+    } else {
+      spectral_df <- data.table(SSN = character(0))
+      spectral_df_sg <- matrix(0, nrow = 0, ncol = 0)
     }
-
-    spectral_df <- data.table(spectra)
-    setnames(spectral_df, old = "V1", new = "SSN")
-    spectral_df[, 2:4840] <- lapply(spectral_df[, 2:4840], as.numeric)
-
-    ## 1st derivatives
-    spectral_df_sg <- savitzkyGolay(X = spectral_df[, 2:4840], p = 3, w = 11, m = 1)
 
 
     ## Reshape data for plotting
@@ -355,9 +358,9 @@ prediction_server <- function(id) {
       value.name = "absorbance_values"
     )
 
-    spectral_df_long <- spectral_df_long[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
+    spectral_df_long <- spectral_df_long[, .(absorbance_values = mean(absorbance_values, na.rm = TRUE)), by = .(wavelength, SSN)]
     spectral_df_long[, wavelength := as.numeric(as.character(wavelength))]
-    spectral_df_long <- spectral_df_long[wavelength >= 617 & wavelength <= 3991, ]
+    spectral_df_long <- spectral_df_long[!is.na(wavelength) & wavelength >= 617 & wavelength <= 3991, ]
     spectral_df_long <- spectral_df_long[order(SSN, wavelength)]
 
     spectral_df_sg_long <- melt.data.table(
@@ -367,9 +370,9 @@ prediction_server <- function(id) {
       value.name = "absorbance_values"
     )
 
-    spectral_df_sg_long <- spectral_df_sg_long[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
+    spectral_df_sg_long <- spectral_df_sg_long[, .(absorbance_values = mean(absorbance_values, na.rm = TRUE)), by = .(wavelength, SSN)]
     spectral_df_sg_long[, wavelength := as.numeric(as.character(wavelength))]
-    spectral_df_sg_long <- spectral_df_sg_long[wavelength >= 617 & wavelength <= 3991, ]
+    spectral_df_sg_long <- spectral_df_sg_long[!is.na(wavelength) & wavelength >= 617 & wavelength <= 3991, ]
     spectral_df_sg_long <- spectral_df_sg_long[order(SSN, wavelength)]
 
 
@@ -445,24 +448,24 @@ prediction_server <- function(id) {
           text = ~SSN,
           type = "scatter",
           mode = "lines",
-          source = "spectral_plot_combined"
+          source = session$ns("spectral_plot_combined")
         ) |>
         layout(
+          yaxis = list(
+            title = y_title,
+            gridcolor = "#7f8c8d", color = "white",
+            titlefont = list(size = 20), tickfont = list(size = 18)
+          ),
           xaxis = list(
             title = "Wavelength (cm<sup>-1</sup>)",
             autorange = "reversed", range = c(3991, 617),
             gridcolor = "#7f8c8d", color = "white",
-            titlefont = list(size = 18), tickfont = list(size = 16)
-          ),
-          yaxis = list(
-            title = y_title,
-            gridcolor = "#7f8c8d", color = "white",
-            titlefont = list(size = 18), tickfont = list(size = 16)
+            titlefont = list(size = 20), tickfont = list(size = 18)
           ),
           dragmode = "zoom",
           plot_bgcolor = "#2d2d2d",
           paper_bgcolor = "#2d2d2d",
-          font = list(color = "white"),
+          font = list(color = "white", size = 16),
           showlegend = FALSE
         )
 
@@ -817,127 +820,101 @@ prediction_server <- function(id) {
     })
 
     # Soil property density plots
-    output$prediction_plot <- renderPlot({
-      if (is.null(prediction_results())) {
-        # Default plot when no prediction
-        par(mfrow = c(1, 1), mar = c(4, 4, 4, 2))
-        plot(1, type = "n", axes = FALSE, xlab = "", ylab = "", main = "")
-        text(1, 1, "Upload spectral data and generate predictions\nto see soil property distributions",
-          cex = 1.5, col = "gray60", font = 2
-        )
-        box(col = "gray80")
-      } else {
-        # Create density plots for soil properties
-        predictions <- prediction_results()
+    # Soil property density plots
+    output$prediction_plot <- renderPlotly({
+      req(prediction_results())
+      predictions <- prediction_results()
 
-        # Define soil properties to plot (excluding SSN)
-        soil_properties <- colnames(predictions)[-1] # Remove SSN column
-        n_props <- length(soil_properties)
-
-        # Calculate optimal grid layout (mfrow)
-        rows <- ceiling(sqrt(n_props))
-        cols <- ceiling(n_props / rows)
-
-        # Set up multi-panel layout with dynamic grid
-        par(mfrow = c(rows, cols), mar = c(5, 5, 4, 2), oma = c(3, 3, 4, 2))
-
-        # Get selected row values if any
-        selected_values <- selected_row_values()
-
-        # Create density plot for each soil property
-        for (i in 1:n_props) {
-          prop_name <- soil_properties[i]
-          prop_values <- as.numeric(predictions[[prop_name]])
-
-          # Remove any NA values
-          prop_values <- prop_values[!is.na(prop_values)]
-
-          if (length(prop_values) > 1) {
-            # Calculate density
-            density_data <- density(prop_values, na.rm = TRUE)
-
-            # Set x-axis limits with lower bound of 0 (except for pH)
-            xlim_range <- NULL
-            if (grepl("Clay", prop_name, ignore.case = TRUE) ||
-              grepl("Sand", prop_name, ignore.case = TRUE) ||
-              grepl("Silt", prop_name, ignore.case = TRUE)) {
-              xlim_range <- c(0, 100)
-            } else if (grepl("pH", prop_name, ignore.case = TRUE)) {
-              # pH can be below 0, so use natural range
-              xlim_range <- NULL
-            } else {
-              # Cut at 0 for all other properties
-              xlim_range <- c(0, max(prop_values, na.rm = TRUE) * 1.1)
-            }
-
-            # Create the density plot
-            plot(density_data,
-              main = prop_name,
-              xlab = "Value",
-              ylab = "Density",
-              col = "steelblue",
-              lwd = 2,
-              cex.main = 1.6,
-              cex.lab = 2.0,
-              cex.axis = 2.0,
-              xlim = xlim_range
-            )
-
-            # Fill under the curve
-            polygon(density_data$x, density_data$y,
-              col = rgb(70 / 255, 130 / 255, 180 / 255, alpha = 0.3),
-              border = NA
-            )
-
-            # Add vertical line for mean
-            abline(v = mean(prop_values), col = "red", lwd = 2, lty = 2)
-            abline(v = median(prop_values), col = "blue", lwd = 2, lty = 2)
-
-            # Add vertical line for selected row value
-            if (!is.null(selected_values) && prop_name %in% colnames(selected_values)) {
-              selected_val <- as.numeric(selected_values[[prop_name]])
-              if (!is.na(selected_val)) {
-                abline(v = selected_val, col = "orange", lwd = 3, lty = 1)
-                # Add a point at the density curve for the selected value
-                selected_density <- approx(density_data$x, density_data$y, xout = selected_val)$y
-                if (!is.na(selected_density)) {
-                  points(selected_val, selected_density, col = "orange", pch = 19, cex = 1.5)
-                }
-              }
-            }
-
-            # Add text showing mean and sd
-            mean_val <- round(mean(prop_values), 2)
-            median_val <- round(median(prop_values), 2)
-            sd_val <- round(sd(prop_values), 2)
-            legend_text <- paste0("Mean: ", mean_val, "\nMedian: ", median_val, "\nSD: ", sd_val)
-
-            # Add selected value to legend if available
-            if (!is.null(selected_values) && prop_name %in% colnames(selected_values)) {
-              selected_val <- as.numeric(selected_values[[prop_name]])
-              if (!is.na(selected_val)) {
-                legend_text <- paste0(legend_text, "\nSelected: ", round(selected_val, 2))
-              }
-            }
-
-            text(par("usr")[2] - 0.02 * diff(par("usr")[1:2]),
-              par("usr")[4] * 0.55,
-              legend_text,
-              cex = 1.6, adj = 1, col = "darkblue"
-            )
-          } else {
-            # If only one value or no values, show a simple message
-            plot(1, type = "n", axes = FALSE, xlab = "", ylab = "", main = prop_name)
-            text(1, 1, "Insufficient data\nfor density plot", cex = 1.0, col = "gray60")
-            box(col = "gray80")
-          }
-        }
-
-        # Add overall title
-        mtext("Distribution of Predicted Soil Properties",
-          side = 3, outer = TRUE, cex = 1.6, font = 2
-        )
+      # Define soil properties to plot (excluding SSN)
+      soil_properties <- colnames(predictions)[-1]
+      if (length(soil_properties) == 0) {
+        return(NULL)
       }
+
+      # Reshape to long format for ggplot
+      plot_data <- melt.data.table(as.data.table(predictions),
+        id.vars = "SSN",
+        variable.name = "Property", value.name = "Value"
+      )
+      plot_data[, Value := as.numeric(Value)]
+      plot_data <- plot_data[!is.na(Value)]
+
+      if (nrow(plot_data) == 0) {
+        return(NULL)
+      }
+
+      # Calculate stats for all properties
+      stats_df <- plot_data[, .(
+        Mean = mean(Value, na.rm = TRUE),
+        Median = median(Value, na.rm = TRUE)
+      ), by = Property]
+
+      # Create ggplot with facets
+      p <- ggplot(plot_data, aes(x = Value)) +
+        geom_density(fill = "steelblue", alpha = 0.3, color = "steelblue")
+
+      # Prepare stats for mapping to get a legend
+      stats_long <- melt(stats_df,
+        id.vars = "Property",
+        variable.name = "Statistic", value.name = "StatValue"
+      )
+
+      p <- p +
+        geom_vline(
+          data = stats_long, aes(xintercept = StatValue, color = Statistic, linetype = Statistic),
+          size = 0.8
+        ) +
+        scale_color_manual(values = c("Mean" = "red", "Median" = "#00ff88")) +
+        scale_linetype_manual(values = c("Mean" = "dashed", "Median" = "dotted")) +
+        facet_wrap(~Property, scales = "free") +
+        theme_minimal(base_size = 16) +
+        theme(
+          text = element_text(color = "white"),
+          axis.text = element_text(color = "white", size = 14),
+          axis.title = element_text(color = "white", size = 16),
+          panel.grid = element_line(color = "#333333"),
+          panel.background = element_rect(fill = "transparent", color = NA),
+          plot.background = element_rect(fill = "transparent", color = NA),
+          strip.text = element_text(color = "white", face = "bold", size = 16),
+          legend.position = "bottom",
+          legend.text = element_text(color = "white", size = 14),
+          legend.title = element_blank()
+        ) +
+        labs(x = NULL, y = "Density")
+
+      # Add highlighting if a row is selected
+      vals <- selected_row_values()
+      if (!is.null(vals)) {
+        # Prepare selection data for vlines
+        sel_df <- data.frame(
+          Property = soil_properties,
+          Value = suppressWarnings(as.numeric(sapply(soil_properties, function(x) vals[[x]])))
+        )
+        sel_df <- sel_df[!is.na(sel_df$Value), ]
+
+        if (nrow(sel_df) > 0) {
+          p <- p + geom_vline(
+            data = sel_df, aes(xintercept = Value),
+            color = "orange", size = 1.2, linetype = "solid"
+          )
+        }
+      }
+
+      # Convert to plotly
+      ggplotly(p) |>
+        layout(
+          paper_bgcolor = "#2d2d2d",
+          plot_bgcolor = "#2d2d2d",
+          margin = list(l = 50, r = 20, b = 100, t = 50),
+          legend = list(
+            orientation = "h",
+            x = 0.5, xanchor = "center",
+            y = -0.2,
+            font = list(color = "white", size = 14)
+          ),
+          showlegend = TRUE
+        ) |>
+        config(displayModeBar = FALSE)
     })
 
     # Spectra count display
@@ -1087,8 +1064,9 @@ prediction_server <- function(id) {
       if (length(input$prediction_table_rows_selected) > 0) {
         selected_row <- input$prediction_table_rows_selected[1]
         selected_values <- prediction_results()[selected_row, ]
+
+        # Update reactive values
         selected_row_values(selected_values)
-        # Also sync with selected_ssn for spectral/PCA highlighting
         selected_ssn(selected_values$SSN)
       } else {
         selected_row_values(NULL)
@@ -1096,11 +1074,50 @@ prediction_server <- function(id) {
       }
     })
 
+    # Texture triangle highlight proxy update
+    observeEvent(selected_row_values(),
+      {
+        req(prediction_results())
+        vals <- selected_row_values()
+
+        predictions <- prediction_results()
+        clay_col <- grep("Clay", colnames(predictions), value = TRUE, ignore.case = TRUE)
+        sand_col <- grep("Sand", colnames(predictions), value = TRUE, ignore.case = TRUE)
+        silt_col <- grep("Silt", colnames(predictions), value = TRUE, ignore.case = TRUE)
+
+        highlight_a <- list(numeric(0))
+        highlight_b <- list(numeric(0))
+        highlight_c <- list(numeric(0))
+        highlight_text <- list("")
+
+        if (!is.null(vals) && length(sand_col) > 0 && length(clay_col) > 0) {
+          clay_val <- as.numeric(vals[[clay_col[1]]])
+          sand_val <- as.numeric(vals[[sand_col[1]]])
+          silt_val <- if (length(silt_col) > 0) as.numeric(vals[[silt_col[1]]]) else (100 - clay_val - sand_val)
+
+          if (!is.na(clay_val) && !is.na(sand_val) && !is.na(silt_val)) {
+            highlight_a <- list(sand_val)
+            highlight_b <- list(clay_val)
+            highlight_c <- list(silt_val)
+            highlight_text <- list(paste0("<b>SELECTED: ", vals$SSN, "</b>"))
+          }
+        }
+
+        plotlyProxy("texture_triangle_plot", session) |>
+          plotlyProxyInvoke("restyle", list(
+            a = highlight_a,
+            b = highlight_b,
+            c = highlight_c,
+            text = highlight_text
+          ), 14L)
+      },
+      ignoreNULL = FALSE
+    )
+
     # Texture triangle plot (Plotly ternary)
     output$texture_triangle_plot <- renderPlotly({
       req(prediction_results())
 
-      # Prepare data for texture triangle - only if both Clay and Sand are present
       predictions <- prediction_results()
 
       clay_col <- grep("Clay", colnames(predictions), value = TRUE, ignore.case = TRUE)
@@ -1162,7 +1179,7 @@ prediction_server <- function(id) {
       )
 
       # Create plotly ternary plot
-      p <- plot_ly()
+      p <- plot_ly(source = session$ns("texture_triangle_plot"))
 
       # Add USDA classification boundaries (very subtle)
       for (class_info in usda_classes) {
@@ -1230,45 +1247,19 @@ prediction_server <- function(id) {
         name = "Samples"
       )
 
-      # Highlight trace (managed reactively)
-      vals <- selected_row_values()
-      highlight_a <- numeric(0)
-      highlight_b <- numeric(0)
-      highlight_c <- numeric(0)
-      highlight_text <- ""
-
-      if (!is.null(vals)) {
-        clay_val <- as.numeric(vals[[clay_col[1]]])
-        sand_val <- as.numeric(vals[[sand_col[1]]])
-
-        silt_val <- if (length(silt_col) > 0) {
-          as.numeric(vals[[silt_col[1]]])
-        } else if (!is.na(clay_val) && !is.na(sand_val)) {
-          100 - clay_val - sand_val
-        } else {
-          NA
-        }
-
-        if (!is.na(clay_val) && !is.na(sand_val) && !is.na(silt_val)) {
-          highlight_a <- sand_val
-          highlight_b <- clay_val
-          highlight_c <- silt_val
-          highlight_text <- paste0("<b>SELECTED: ", vals$SSN, "</b>")
-        }
-      }
-
+      # Add EMPTY selection trace (Trace Index 14)
       p <- p |> add_trace(
         type = "scatterternary",
         mode = "markers",
-        a = highlight_a, b = highlight_b, c = highlight_c,
-        text = highlight_text,
+        a = numeric(0), b = numeric(0), c = numeric(0),
+        text = "",
         hoverinfo = "text",
         marker = list(
           size = 14, color = "orange", opacity = 1,
           line = list(color = "white", width = 2)
         ),
         showlegend = FALSE,
-        name = "Selected"
+        name = "SelectedTrace"
       )
 
       # Configure layout
@@ -1276,20 +1267,20 @@ prediction_server <- function(id) {
         ternary = list(
           sum = 100,
           aaxis = list(
-            title = list(text = "Sand %", font = list(color = "white", size = 12)),
-            tickfont = list(color = "white", size = 10),
+            title = list(text = "Sand %", font = list(color = "white", size = 16)),
+            tickfont = list(color = "white", size = 14),
             gridcolor = "rgba(128, 128, 128, 0.3)",
             linecolor = "white"
           ),
           baxis = list(
-            title = list(text = "Clay %", font = list(color = "white", size = 12)),
-            tickfont = list(color = "white", size = 10),
+            title = list(text = "Clay %", font = list(color = "white", size = 16)),
+            tickfont = list(color = "white", size = 14),
             gridcolor = "rgba(128, 128, 128, 0.3)",
             linecolor = "white"
           ),
           caxis = list(
-            title = list(text = "Silt %", font = list(color = "white", size = 12)),
-            tickfont = list(color = "white", size = 10),
+            title = list(text = "Silt %", font = list(color = "white", size = 16)),
+            tickfont = list(color = "white", size = 14),
             gridcolor = "rgba(128, 128, 128, 0.3)",
             linecolor = "white"
           ),
@@ -1299,7 +1290,7 @@ prediction_server <- function(id) {
         plot_bgcolor = "#2d2d2d",
         hoverlabel = list(
           bgcolor = "#1a1a1a",
-          font = list(color = "white", size = 12, family = "Poppins"),
+          font = list(color = "white", size = 14, family = "Poppins"),
           bordercolor = "#00ff88"
         ),
         margin = list(l = 50, r = 50, t = 50, b = 50)
@@ -1316,6 +1307,7 @@ prediction_server <- function(id) {
 
     # PCA model
     pca_model <- reactive({
+      # Note: Filename was fixed from "mir_pca_model " to "mir_pca_model.rds"
       readRDS(file.path("pca_model", "mir_pca_model.rds"))
     })
 
@@ -1359,7 +1351,11 @@ prediction_server <- function(id) {
 
     # Helper function for PCA contour plots with overlay
     render_pca_contour <- function(pca_df, x_var, y_var, title, overlay_df = NULL, source_id = NULL) {
-      p <- plot_ly(pca_df, x = as.formula(paste0("~", x_var)), y = as.formula(paste0("~", y_var)), source = source_id) |>
+      p <- plot_ly(pca_df,
+        x = as.formula(paste0("~", x_var)),
+        y = as.formula(paste0("~", y_var)),
+        source = if (!is.null(source_id)) session$ns(source_id) else NULL
+      ) |>
         add_histogram2dcontour(
           colorscale = list(
             list(0, "rgba(0, 0, 0, 0)"),
@@ -1406,16 +1402,16 @@ prediction_server <- function(id) {
             gridcolor = "#333333",
             zerolinecolor = "#444444",
             color = "white",
-            titlefont = list(size = 16),
-            tickfont = list(size = 14)
+            titlefont = list(size = 18),
+            tickfont = list(size = 16)
           ),
           yaxis = list(
             title = y_var,
             gridcolor = "#333333",
             zerolinecolor = "#444444",
             color = "white",
-            titlefont = list(size = 16),
-            tickfont = list(size = 14)
+            titlefont = list(size = 18),
+            tickfont = list(size = 16)
           ),
           margin = list(l = 50, r = 20, b = 50, t = 60),
           title = list(
@@ -1434,32 +1430,45 @@ prediction_server <- function(id) {
       p
     }
 
-    # Observe clicks on plots (PCA and Spectral)
-    observe({
-      click_12 <- event_data("plotly_click", source = "pca_plot_12")
-      click_13 <- event_data("plotly_click", source = "pca_plot_13")
-      click_23 <- event_data("plotly_click", source = "pca_plot_23")
-      click_spectral <- event_data("plotly_click", source = "spectral_plot_combined")
-      click_ternary <- event_data("plotly_click", source = "texture_triangle_plot")
+    # --- CROSS-PLOT LINKAGE ---
 
-      clicked_ssn <- NULL
-      if (!is.null(click_12)) clicked_ssn <- click_12$customdata
-      if (!is.null(click_13)) clicked_ssn <- click_13$customdata
-      if (!is.null(click_23)) clicked_ssn <- click_23$customdata
-      if (!is.null(click_spectral)) clicked_ssn <- click_spectral$customdata
-      if (!is.null(click_ternary)) clicked_ssn <- click_ternary$customdata
+    # helper for processing clicks
+    process_plot_click <- function(click_data) {
+      if (!is.null(click_data) && "customdata" %in% names(click_data)) {
+        ssn_val <- click_data$customdata
+        clicked_ssn <- if (is.list(ssn_val)) ssn_val[[1]] else ssn_val
 
-      if (!is.null(clicked_ssn)) {
-        selected_ssn(clicked_ssn)
+        if (!is.null(clicked_ssn) && !is.na(clicked_ssn)) {
+          selected_ssn(clicked_ssn)
 
-        # Programmatically select the row in the table
-        if (!is.null(prediction_results())) {
-          row_idx <- which(prediction_results()$SSN == clicked_ssn)
-          if (length(row_idx) > 0) {
-            DT::selectRows(DT::dataTableProxy("prediction_table"), row_idx)
+          # Sync table selection
+          if (!is.null(prediction_results())) {
+            row_idx <- which(prediction_results()$SSN == clicked_ssn)
+            if (length(row_idx) > 0) {
+              DT::selectRows(DT::dataTableProxy("prediction_table"), row_idx)
+              # Update values for results-specific plots
+              selected_row_values(prediction_results()[row_idx[1], ])
+            }
           }
         }
       }
+    }
+
+    # Individual observers for each click source
+    observeEvent(event_data("plotly_click", source = session$ns("pca_plot_12")), {
+      process_plot_click(event_data("plotly_click", source = session$ns("pca_plot_12")))
+    })
+    observeEvent(event_data("plotly_click", source = session$ns("pca_plot_13")), {
+      process_plot_click(event_data("plotly_click", source = session$ns("pca_plot_13")))
+    })
+    observeEvent(event_data("plotly_click", source = session$ns("pca_plot_23")), {
+      process_plot_click(event_data("plotly_click", source = session$ns("pca_plot_23")))
+    })
+    observeEvent(event_data("plotly_click", source = session$ns("spectral_plot_combined")), {
+      process_plot_click(event_data("plotly_click", source = session$ns("spectral_plot_combined")))
+    })
+    observeEvent(event_data("plotly_click", source = session$ns("texture_triangle_plot")), {
+      process_plot_click(event_data("plotly_click", source = session$ns("texture_triangle_plot")))
     })
 
     output$pca_plot_12 <- renderPlotly({
