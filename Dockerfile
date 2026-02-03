@@ -26,9 +26,12 @@ RUN Rscript -e "install.packages(c('RApiSerialize', 'stringfish', 'BH'), repos='
 RUN wget https://cran.r-project.org/src/contrib/Archive/qs/qs_0.27.3.tar.gz -O /tmp/qs_0.27.3.tar.gz
 RUN Rscript -e "install.packages('/tmp/qs_0.27.3.tar.gz', repos=NULL, type='source')"
 
-RUN Rscript -e "install.packages(c('shiny', 'bslib', 'data.table', 'plotly', 'shinyjs', 'remotes', 'mirai', 'prospectr', 'DT', 'ranger', 'htmltools', 'viridis', 'shinycssloaders'), repos='https://cran.rstudio.com')"
+RUN Rscript -e "install.packages(c('shiny', 'bslib', 'data.table', 'plotly', 'shinyjs', 'remotes', 'mirai', 'prospectr', 'DT', 'ranger', 'htmltools', 'viridis', 'shinycssloaders', 'torch', 'ggplot2'), repos='https://cran.rstudio.com')"
+RUN Rscript -e "torch::install_torch()"
 RUN Rscript -e "remotes::install_github(c('spectral-cockpit/opusreader2', 'pierreroudier/opusreader'))" 
-          
+
+
+
 # Port
 EXPOSE 3838
  
