@@ -81,10 +81,10 @@ prediction_ui <- function(id) {
                     label = NULL,
                     choices = c(
                       "SOC" = "SOC", "TN" = "TN", "pH" = "pH", "CEC" = "CEC",
-                      "Clay" = "clay", "Sand" = "sand", "ExCa" = "ExCa",
+                      "Clay" = "clay", "Silt" = "silt", "Sand" = "sand", "ExCa" = "ExCa",
                       "ExMg" = "ExMg", "ExK" = "ExK"
                     ),
-                    selected = c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK"),
+                    selected = c("SOC", "TN", "pH", "CEC", "clay", "silt", "sand", "ExCa", "ExMg", "ExK"),
                     inline = TRUE
                   )
                 )
@@ -169,6 +169,22 @@ prediction_ui <- function(id) {
         title = list(icon("table"), "Prediction Results"),
         value = "results",
         card_body(
+          # Tip! Card
+          card(
+            class = "spectral-card mb-3",
+            style = "background-color: rgba(0, 255, 136, 0.05); border: 1px dashed rgba(0, 255, 136, 0.3);",
+            card_body(
+              div(
+                class = "d-flex align-items-center",
+                icon("lightbulb", class = "me-3", style = "color: #00ff88; font-size: 1.5em;"),
+                div(
+                  h6("Tip!", class = "mb-1", style = "color: #00ff88;"),
+                  p("Clicking on a row in the table will highlight that specific sample in the texture triangle and the distribution plots below.", class = "mb-0 small")
+                )
+              )
+            )
+          ),
+
           # Results table and texture triangle layout
           div(
             class = "mb-4",
@@ -359,7 +375,7 @@ prediction_server <- function(id) {
 
     # Reactive value for derivative toggle
     show_derivative <- reactiveVal(FALSE)
-    # Reactive value for linked selection from PCA
+    # Reactive value for linked selection from PCA/Table
     selected_ssn <- reactiveVal(NULL)
 
     # Toggle derivative button handler
@@ -381,56 +397,39 @@ prediction_server <- function(id) {
       }
     })
 
-    ### Render combined plot
-    output$spectral_plot_combined <- renderPlotly({
-      # Determine which data to use based on toggle state
+    # Reactive for current spectral plot data (handles original/derivative toggle)
+    current_spectral_plot_data <- reactive({
+      # Force dependency on data and toggle
       use_derivative <- show_derivative()
+      orig_df <- uploaded_spectra_df()
+      sg_df <- uploaded_spectra_df_sg()
 
       if (use_derivative) {
-        # Use derivative data
-        if (!is.null(uploaded_spectra_df_sg())) {
-          # Process uploaded SG data for plotting
-          plot_data <- melt.data.table(
-            uploaded_spectra_df_sg(),
-            id.vars = "SSN",
-            variable.name = "wavelength",
-            value.name = "absorbance_values"
-          )
-
+        if (!is.null(sg_df)) {
+          plot_data <- melt.data.table(sg_df, id.vars = "SSN", variable.name = "wavelength", value.name = "absorbance_values")
           plot_data[, absorbance_values := as.numeric(as.character(absorbance_values))]
-
-          plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
-
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
-
-          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
-          plot_data <- plot_data[order(SSN, wavelength)]
+          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991][order(SSN, wavelength)]
         } else {
           plot_data <- spectral_df_sg_long
         }
-        y_title <- "First Derivative"
-        plot_title <- ""
       } else {
-        # Use original data
-        if (!is.null(uploaded_spectra_df())) {
-          # Process uploaded data for plotting
-          plot_data <- melt.data.table(
-            uploaded_spectra_df(),
-            id.vars = "SSN",
-            variable.name = "wavelength",
-            value.name = "absorbance_values"
-          )
-
-          plot_data <- plot_data[, .(absorbance_values = mean(absorbance_values)), by = .(wavelength, SSN)]
+        if (!is.null(orig_df)) {
+          plot_data <- melt.data.table(orig_df, id.vars = "SSN", variable.name = "wavelength", value.name = "absorbance_values")
           plot_data[, wavelength := as.numeric(as.character(wavelength))]
-          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991, ]
-          plot_data <- plot_data[order(SSN, wavelength)]
+          plot_data <- plot_data[wavelength >= 617 & wavelength <= 3991][order(SSN, wavelength)]
         } else {
           plot_data <- spectral_df_long
         }
-        y_title <- "Absorbance"
-        plot_title <- ""
       }
+      plot_data
+    })
+
+    ### Render combined plot
+    output$spectral_plot_combined <- renderPlotly({
+      plot_data <- current_spectral_plot_data()
+      use_derivative <- show_derivative()
+      y_title <- if (use_derivative) "First Derivative" else "Absorbance"
 
       # Create plasma-like color palette
       n_samples <- length(unique(plot_data$SSN))
@@ -442,71 +441,91 @@ prediction_server <- function(id) {
           y = ~absorbance_values,
           color = ~SSN,
           colors = plasma_colors,
+          customdata = ~SSN,
+          text = ~SSN,
           type = "scatter",
           mode = "lines",
           source = "spectral_plot_combined"
         ) |>
         layout(
-          title = list(
-            text = plot_title,
-            font = list(color = "white", size = 20)
-          ),
           xaxis = list(
             title = "Wavelength (cm<sup>-1</sup>)",
-            autorange = "reversed",
-            range = c(3991, 617),
-            gridcolor = "#7f8c8d",
-            color = "white",
-            titlefont = list(size = 18),
-            tickfont = list(size = 16)
+            autorange = "reversed", range = c(3991, 617),
+            gridcolor = "#7f8c8d", color = "white",
+            titlefont = list(size = 18), tickfont = list(size = 16)
           ),
           yaxis = list(
             title = y_title,
-            gridcolor = "#7f8c8d",
-            color = "white",
-            titlefont = list(size = 18),
-            tickfont = list(size = 16)
+            gridcolor = "#7f8c8d", color = "white",
+            titlefont = list(size = 18), tickfont = list(size = 16)
           ),
           dragmode = "zoom",
           plot_bgcolor = "#2d2d2d",
           paper_bgcolor = "#2d2d2d",
           font = list(color = "white"),
-          hoverlabel = list(
-            font = list(size = 16)
-          )
+          showlegend = FALSE
         )
 
-      # Highlight selected SSN if any
-      if (!is.null(selected_ssn())) {
-        highlight_ssn <- selected_ssn()
-        highlight_data <- plot_data[SSN == highlight_ssn]
-
-        if (nrow(highlight_data) > 0) {
-          p <- p |>
-            add_trace(
-              data = highlight_data,
-              x = ~wavelength,
-              y = ~absorbance_values,
-              type = "scatter",
-              mode = "lines",
-              line = list(color = "#FF0000", width = 3),
-              name = paste("Selected:", highlight_ssn),
-              hoverinfo = "name",
-              inherit = FALSE
-            )
-        }
-      }
+      # Initial highlight if any (using isolate to prevent re-render on selection)
+      p <- p |> add_trace(
+        x = numeric(0), y = numeric(0),
+        type = "scatter", mode = "lines",
+        line = list(color = "#FF0000", width = 3),
+        name = "Highlight", hoverinfo = "name",
+        inherit = FALSE
+      )
 
       p |>
         event_register("plotly_relayout") |>
-        event_register("plotly_doubleclick")
+        event_register("plotly_doubleclick") |>
+        event_register("plotly_click")
     })
 
-    # Reset plot and selection when double-clicking
+    # Efficiently update highlighting using plotlyProxy
+    observeEvent(selected_ssn(),
+      {
+        ssn <- selected_ssn()
+
+        # 1. Update spectral plot via proxy
+        p_proxy <- plotlyProxy("spectral_plot_combined", session)
+        n_data_traces <- length(unique(current_spectral_plot_data()$SSN))
+
+        if (is.null(ssn)) {
+          p_proxy |> plotlyProxyInvoke("restyle", list(x = list(numeric(0)), y = list(numeric(0))), as.integer(n_data_traces))
+          # Clear detailed selection data
+          isolate(selected_row_values(NULL))
+        } else {
+          h_data <- current_spectral_plot_data()[SSN == ssn]
+          if (nrow(h_data) > 0) {
+            p_proxy |> plotlyProxyInvoke("restyle", list(
+              x = list(h_data$wavelength),
+              y = list(h_data$absorbance_values),
+              name = list(paste("Selected:", ssn))
+            ), as.integer(n_data_traces))
+          }
+        }
+
+        # 2. Sync with selected_row_values for distribution plots and triangle
+        if (!is.null(ssn) && !is.null(prediction_results())) {
+          # Find matching row in results
+          results <- prediction_results()
+          match <- results[results$SSN == ssn, ]
+          if (nrow(match) > 0) {
+            # Use isolate to avoid recursive calls
+            isolate(selected_row_values(match))
+          }
+        }
+      },
+      ignoreInit = TRUE
+    )
+
+
     observeEvent(event_data("plotly_doubleclick", source = "spectral_plot_combined"), {
       plotlyProxy("spectral_plot_combined", session) %>%
         plotlyProxyInvoke("relayout", list("xaxis.autorange" = TRUE, "yaxis.autorange" = TRUE))
       selected_ssn(NULL)
+      # Also clear table selection
+      DT::selectRows(DT::dataTableProxy("prediction_table"), NULL)
     })
 
     # Reset selection when reset button is clicked
@@ -514,6 +533,8 @@ prediction_server <- function(id) {
       plotlyProxy("spectral_plot_combined", session) %>%
         plotlyProxyInvoke("relayout", list("xaxis.autorange" = TRUE, "yaxis.autorange" = TRUE))
       selected_ssn(NULL)
+      # Also clear table selection
+      DT::selectRows(DT::dataTableProxy("prediction_table"), NULL)
     })
 
     ### File upload and processing
@@ -700,12 +721,12 @@ prediction_server <- function(id) {
           # Dynamic column renaming based on selected properties
           all_units <- c(
             "SOC" = "g_kg", "TN" = "g_kg", "pH" = "", "CEC" = "cmolc_kg",
-            "clay" = "%", "sand" = "%", "ExCa" = "cmolc_kg", "ExMg" = "cmolc_kg", "ExK" = "cmolc_kg"
+            "clay" = "%", "silt" = "%", "sand" = "%", "ExCa" = "cmolc_kg", "ExMg" = "cmolc_kg", "ExK" = "cmolc_kg"
           )
 
           all_display_names <- c(
             "SOC" = "SOC", "TN" = "TN", "pH" = "pH", "CEC" = "CEC",
-            "clay" = "Clay", "sand" = "Sand", "ExCa" = "ExCa", "ExMg" = "ExMg", "ExK" = "ExK"
+            "clay" = "Clay", "silt" = "Silt", "sand" = "Sand", "ExCa" = "ExCa", "ExMg" = "ExMg", "ExK" = "ExK"
           )
 
           new_colnames <- c("SSN")
@@ -713,7 +734,7 @@ prediction_server <- function(id) {
             if (var %in% names(all_units)) {
               unit <- all_units[var]
               display_name <- all_display_names[var]
-              col_name <- if (unit != "") paste0(display_name, " (", unit, ")") else display_name
+              col_name <- if (unit != "") paste0(display_name, "_", unit) else display_name
               new_colnames <- c(new_colnames, col_name)
             }
           }
@@ -725,7 +746,7 @@ prediction_server <- function(id) {
             if (var %in% names(all_units)) {
               unit <- all_units[var]
               display_name <- all_display_names[var]
-              col_name <- if (unit != "") paste0(display_name, " (", unit, ")") else display_name
+              col_name <- if (unit != "") paste0(display_name, "_", unit) else display_name
               final_colnames <- c(final_colnames, col_name)
             } else {
               final_colnames <- c(final_colnames, var)
@@ -733,6 +754,10 @@ prediction_server <- function(id) {
           }
 
           colnames(predictions) <- final_colnames
+
+          # Final sanitization: remove () and replace / with _
+          colnames(predictions) <- gsub("[()]", "", colnames(predictions))
+          colnames(predictions) <- gsub("/", "_", colnames(predictions))
 
           # Store results and update state
           prediction_results(predictions)
@@ -809,8 +834,12 @@ prediction_server <- function(id) {
         soil_properties <- colnames(predictions)[-1] # Remove SSN column
         n_props <- length(soil_properties)
 
-        # Set up multi-panel layout with more padding
-        par(mfrow = c(3, 3), mar = c(5, 5, 4, 2), oma = c(3, 3, 4, 2))
+        # Calculate optimal grid layout (mfrow)
+        rows <- ceiling(sqrt(n_props))
+        cols <- ceiling(n_props / rows)
+
+        # Set up multi-panel layout with dynamic grid
+        par(mfrow = c(rows, cols), mar = c(5, 5, 4, 2), oma = c(3, 3, 4, 2))
 
         # Get selected row values if any
         selected_values <- selected_row_values()
@@ -829,9 +858,11 @@ prediction_server <- function(id) {
 
             # Set x-axis limits with lower bound of 0 (except for pH)
             xlim_range <- NULL
-            if (prop_name %in% c("Clay_%", "Sand_%")) {
+            if (grepl("Clay", prop_name, ignore.case = TRUE) ||
+              grepl("Sand", prop_name, ignore.case = TRUE) ||
+              grepl("Silt", prop_name, ignore.case = TRUE)) {
               xlim_range <- c(0, 100)
-            } else if (prop_name == "pH") {
+            } else if (grepl("pH", prop_name, ignore.case = TRUE)) {
               # pH can be below 0, so use natural range
               xlim_range <- NULL
             } else {
@@ -1057,8 +1088,11 @@ prediction_server <- function(id) {
         selected_row <- input$prediction_table_rows_selected[1]
         selected_values <- prediction_results()[selected_row, ]
         selected_row_values(selected_values)
+        # Also sync with selected_ssn for spectral/PCA highlighting
+        selected_ssn(selected_values$SSN)
       } else {
         selected_row_values(NULL)
+        selected_ssn(NULL)
       }
     })
 
@@ -1069,13 +1103,14 @@ prediction_server <- function(id) {
       # Prepare data for texture triangle - only if both Clay and Sand are present
       predictions <- prediction_results()
 
-      clay_col <- grep("Clay", colnames(predictions), value = TRUE)
-      sand_col <- grep("Sand", colnames(predictions), value = TRUE)
+      clay_col <- grep("Clay", colnames(predictions), value = TRUE, ignore.case = TRUE)
+      silt_col <- grep("Silt", colnames(predictions), value = TRUE, ignore.case = TRUE)
+      sand_col <- grep("Sand", colnames(predictions), value = TRUE, ignore.case = TRUE)
 
       if (length(clay_col) == 0 || length(sand_col) == 0) {
         return(plot_ly() |>
           layout(
-            title = list(text = "Texture triangle requires both Clay and Sand predictions", font = list(color = "white", size = 12)),
+            title = list(text = "Texture triangle requires at least Clay and Sand predictions", font = list(color = "white", size = 12)),
             paper_bgcolor = "#2d2d2d",
             plot_bgcolor = "#2d2d2d"
           ))
@@ -1084,9 +1119,14 @@ prediction_server <- function(id) {
       texture_data <- data.frame(
         SSN = predictions$SSN,
         Clay = predictions[[clay_col]],
-        Sand = predictions[[sand_col]],
-        Silt = 100 - predictions[[clay_col]] - predictions[[sand_col]]
+        Sand = predictions[[sand_col]]
       )
+
+      if (length(silt_col) > 0) {
+        texture_data$Silt <- predictions[[silt_col]]
+      } else {
+        texture_data$Silt <- 100 - texture_data$Clay - texture_data$Sand
+      }
 
       # Remove any rows with negative silt or NA values
       texture_data <- texture_data[texture_data$Silt >= 0 &
@@ -1164,19 +1204,21 @@ prediction_server <- function(id) {
         showlegend = FALSE
       )
 
-      # Add data points
+      # Add actual data points
       p <- p |> add_trace(
+        data = texture_data,
         type = "scatterternary",
         mode = "markers",
-        a = texture_data$Sand,
-        b = texture_data$Clay,
-        c = texture_data$Silt,
+        a = ~Sand,
+        b = ~Clay,
+        c = ~Silt,
         text = ~ paste0(
-          "<b>", texture_data$SSN, "</b><br>",
-          "Sand: ", round(texture_data$Sand, 1), "%<br>",
-          "Clay: ", round(texture_data$Clay, 1), "%<br>",
-          "Silt: ", round(texture_data$Silt, 1), "%"
+          "<b>SSN: ", SSN, "</b><br>",
+          "Sand: ", round(Sand, 1), "%<br>",
+          "Clay: ", round(Clay, 1), "%<br>",
+          "Silt: ", round(Silt, 1), "%"
         ),
+        customdata = ~SSN,
         hoverinfo = "text",
         marker = list(
           size = 8,
@@ -1188,38 +1230,46 @@ prediction_server <- function(id) {
         name = "Samples"
       )
 
-      # Highlight selected row if any
-      selected_values <- selected_row_values()
-      if (!is.null(selected_values)) {
-        clay_val <- if (length(clay_col) > 0) as.numeric(selected_values[[clay_col]]) else NA
-        sand_val <- if (length(sand_col) > 0) as.numeric(selected_values[[sand_col]]) else NA
-        selected_silt <- 100 - clay_val - sand_val
+      # Highlight trace (managed reactively)
+      vals <- selected_row_values()
+      highlight_a <- numeric(0)
+      highlight_b <- numeric(0)
+      highlight_c <- numeric(0)
+      highlight_text <- ""
 
-        if (!is.na(clay_val) && !is.na(sand_val) && selected_silt >= 0) {
-          p <- p |> add_trace(
-            type = "scatterternary",
-            mode = "markers",
-            a = sand_val,
-            b = clay_val,
-            c = selected_silt,
-            text = ~ paste0(
-              "<b>SELECTED: ", selected_values$SSN, "</b><br>",
-              "Sand: ", round(sand_val, 1), "%<br>",
-              "Clay: ", round(clay_val, 1), "%<br>",
-              "Silt: ", round(selected_silt, 1), "%"
-            ),
-            hoverinfo = "text",
-            marker = list(
-              size = 14,
-              color = "orange",
-              opacity = 1,
-              line = list(color = "white", width = 2)
-            ),
-            showlegend = FALSE,
-            name = "Selected"
-          )
+      if (!is.null(vals)) {
+        clay_val <- as.numeric(vals[[clay_col[1]]])
+        sand_val <- as.numeric(vals[[sand_col[1]]])
+
+        silt_val <- if (length(silt_col) > 0) {
+          as.numeric(vals[[silt_col[1]]])
+        } else if (!is.na(clay_val) && !is.na(sand_val)) {
+          100 - clay_val - sand_val
+        } else {
+          NA
+        }
+
+        if (!is.na(clay_val) && !is.na(sand_val) && !is.na(silt_val)) {
+          highlight_a <- sand_val
+          highlight_b <- clay_val
+          highlight_c <- silt_val
+          highlight_text <- paste0("<b>SELECTED: ", vals$SSN, "</b>")
         }
       }
+
+      p <- p |> add_trace(
+        type = "scatterternary",
+        mode = "markers",
+        a = highlight_a, b = highlight_b, c = highlight_c,
+        text = highlight_text,
+        hoverinfo = "text",
+        marker = list(
+          size = 14, color = "orange", opacity = 1,
+          line = list(color = "white", width = 2)
+        ),
+        showlegend = FALSE,
+        name = "Selected"
+      )
 
       # Configure layout
       p <- p |> layout(
@@ -1255,8 +1305,13 @@ prediction_server <- function(id) {
         margin = list(l = 50, r = 50, t = 50, b = 50)
       )
 
-      p
+      p |>
+        config(displayModeBar = FALSE) |>
+        event_register("plotly_click")
     })
+
+    # Texture triangle highlight proxy update - removed in favor of reactive rendering
+    # for better reliability with ternary plots
 
 
     # PCA model
@@ -1379,19 +1434,31 @@ prediction_server <- function(id) {
       p
     }
 
-    # Observe clicks on PCA plots
+    # Observe clicks on plots (PCA and Spectral)
     observe({
       click_12 <- event_data("plotly_click", source = "pca_plot_12")
       click_13 <- event_data("plotly_click", source = "pca_plot_13")
       click_23 <- event_data("plotly_click", source = "pca_plot_23")
+      click_spectral <- event_data("plotly_click", source = "spectral_plot_combined")
+      click_ternary <- event_data("plotly_click", source = "texture_triangle_plot")
 
       clicked_ssn <- NULL
       if (!is.null(click_12)) clicked_ssn <- click_12$customdata
       if (!is.null(click_13)) clicked_ssn <- click_13$customdata
       if (!is.null(click_23)) clicked_ssn <- click_23$customdata
+      if (!is.null(click_spectral)) clicked_ssn <- click_spectral$customdata
+      if (!is.null(click_ternary)) clicked_ssn <- click_ternary$customdata
 
       if (!is.null(clicked_ssn)) {
         selected_ssn(clicked_ssn)
+
+        # Programmatically select the row in the table
+        if (!is.null(prediction_results())) {
+          row_idx <- which(prediction_results()$SSN == clicked_ssn)
+          if (length(row_idx) > 0) {
+            DT::selectRows(DT::dataTableProxy("prediction_table"), row_idx)
+          }
+        }
       }
     })
 

@@ -134,7 +134,7 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     results_df <- data.frame(SSN = spectra_mir$SSN)
 
     ## Map soil variables to their torch model files
-    all_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "ExCa", "ExMg", "ExK")
+    all_soilvars <- c("SOC", "TN", "pH", "CEC", "clay", "sand", "silt", "ExCa", "ExMg", "ExK")
 
     # Use selected variables if provided, otherwise use all
     list_soilvars <- if (is.null(selected_vars)) all_soilvars else selected_vars
@@ -164,6 +164,22 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         ratio <- median(results_df$TN / results_df$SOC, na.rm = TRUE)
         if (!is.na(ratio) && ratio > 0.5) {
             results_df$TN <- round(results_df$TN / 10, 2)
+        }
+    }
+
+    ## Texture closure: Ensure Clay + Sand + Silt = 100%
+    texture_vars <- c("clay", "sand", "silt")
+    present_texture <- intersect(texture_vars, names(results_df))
+
+    if (length(present_texture) == 3) {
+        # Perform closure across all three components
+        sums <- rowSums(results_df[, texture_vars, drop = FALSE], na.rm = TRUE)
+        # Avoid division by zero
+        valid_sums <- !is.na(sums) & sums > 0
+        if (any(valid_sums)) {
+            for (var in texture_vars) {
+                results_df[valid_sums, var] <- round(results_df[valid_sums, var] / sums[valid_sums] * 100, 2)
+            }
         }
     }
 
