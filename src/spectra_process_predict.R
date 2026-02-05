@@ -118,6 +118,19 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     )
     colnames(spectra_mir_sel_resampled) <- paste0("w", wavebands_ref)
 
+    ## Apply Alpha bias correction (Alpha -> MIR) on resampled spectra
+    bias_model_path <- file.path("models", "spectra_process", "alpha_bias_correction.rds")
+    if (file.exists(bias_model_path)) {
+        bias_model <- readRDS(bias_model_path)
+        bias_cols <- paste0("w", names(bias_model$bias))
+        matched_cols <- intersect(bias_cols, colnames(spectra_mir_sel_resampled))
+        if (length(matched_cols) > 0) {
+            bias_vec <- bias_model$bias[gsub("^w", "", matched_cols)]
+            spectra_mir_sel_resampled[, matched_cols] <-
+                sweep(spectra_mir_sel_resampled[, matched_cols], 2, bias_vec, "-")
+        }
+    }
+
     ## SG first derivative on the resampled spectra (matches reference modeling)
     # p=2, w=11, m=1
     spectra_mir_sel_resampled_sg <- savitzkyGolay(
@@ -167,16 +180,26 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         }
     }
 
+    ## Sanity check: flag negative predictions as -99 (very uncertain)
+    pred_cols <- setdiff(names(results_df), "SSN")
+    for (col in pred_cols) {
+        neg <- !is.na(results_df[[col]]) & results_df[[col]] < 0
+        results_df[[col]][neg] <- -99
+    }
+
     ## Texture derivation and closure
     # silt = 100 - (clay + sand)
     if ("clay" %in% names(results_df) && "sand" %in% names(results_df)) {
-        # 1. Clip Clay and Sand to [0, 100]
-        results_df$clay <- pmax(0, pmin(100, results_df$clay))
-        results_df$sand <- pmax(0, pmin(100, results_df$sand))
+        # Identify valid rows (not flagged as uncertain)
+        valid <- results_df$clay != -99 & results_df$sand != -99
 
-        # 2. Check sum and scale if > 100
+        # 1. Clip valid Clay and Sand to [0, 100]
+        results_df$clay[valid] <- pmax(0, pmin(100, results_df$clay[valid]))
+        results_df$sand[valid] <- pmax(0, pmin(100, results_df$sand[valid]))
+
+        # 2. Check sum and scale if > 100 (valid rows only)
         sums_cs <- results_df$clay + results_df$sand
-        over_100 <- sums_cs > 100 & !is.na(sums_cs)
+        over_100 <- valid & !is.na(sums_cs) & sums_cs > 100
 
         if (any(over_100)) {
             # Scale proportionally so clay + sand = 100
@@ -184,14 +207,14 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
             results_df$sand[over_100] <- (results_df$sand[over_100] / sums_cs[over_100]) * 100
         }
 
-        # 3. Derive Silt
-        results_df$silt <- round(100 - (results_df$clay + results_df$sand), 2)
-        # Ensure rounding didn't push it slightly negative
-        results_df$silt <- pmax(0, results_df$silt)
+        # 3. Derive Silt (only for valid rows; flag invalid as -99)
+        results_df$silt <- -99
+        results_df$silt[valid] <- round(100 - (results_df$clay[valid] + results_df$sand[valid]), 2)
+        results_df$silt[valid] <- pmax(0, results_df$silt[valid])
 
-        # 4. Final rounding for all components
-        results_df$clay <- round(results_df$clay, 2)
-        results_df$sand <- round(results_df$sand, 2)
+        # 4. Final rounding for valid rows
+        results_df$clay[valid] <- round(results_df$clay[valid], 2)
+        results_df$sand[valid] <- round(results_df$sand[valid], 2)
     }
 
     ## Output spectra and SG derivatives with SSN

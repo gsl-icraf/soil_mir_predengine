@@ -20,6 +20,7 @@ source("modules/home_module.R")
 source("modules/prediction_module.R")
 source("modules/instructions_module.R")
 source("modules/property_info_module.R")
+source("modules/processing_info_module.R")
 
 # Set maximum upload size to 250 MB
 options(shiny.maxRequestSize = 50 * 1024^2)
@@ -168,6 +169,12 @@ ui <- function(request) {
           ),
           a(
             class = "nav-link",
+            href = "?page=processing",
+            `data-page` = "processing",
+            icon("cogs"), " Processing Pipeline"
+          ),
+          a(
+            class = "nav-link",
             href = "?page=properties",
             `data-page` = "properties",
             icon("flask"), " Soil Properties"
@@ -207,6 +214,15 @@ ui <- function(request) {
         )
       ),
 
+      # Processing Pipeline content
+      conditionalPanel(
+        condition = "input.current_page == 'processing' || (typeof input.current_page === 'undefined' && window.currentPage === 'processing')",
+        div(
+          class = "router-page",
+          processing_info_ui("processing")
+        )
+      ),
+
       # Soil Properties content
       conditionalPanel(
         condition = "input.current_page == 'properties' || (typeof input.current_page === 'undefined' && window.currentPage === 'properties')",
@@ -235,6 +251,7 @@ server <- function(input, output, session) {
   home_server("home")
   prediction_server("prediction")
   instructions_server("instructions")
+  processing_info_server("processing")
   property_info_server("properties")
 }
 
