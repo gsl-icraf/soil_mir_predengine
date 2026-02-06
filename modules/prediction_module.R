@@ -217,7 +217,8 @@ prediction_ui <- function(id) {
                 ),
                 card_body(
                   DT::dataTableOutput(ns("prediction_table"))
-                )
+                ),
+                uiOutput(ns("warning_negative_predictions"))
               ),
 
               # Right: Texture triangle card
@@ -236,6 +237,7 @@ prediction_ui <- function(id) {
 
           # Density plots card
           card(
+            full_screen = TRUE,
             class = "spectral-card",
             card_header(
               icon("chart-area"), " Soil Property Distributions",
@@ -375,6 +377,9 @@ prediction_server <- function(id) {
     spectral_df_sg_long <- spectral_df_sg_long[!is.na(wavelength) & wavelength >= 617 & wavelength <= 3991, ]
     spectral_df_sg_long <- spectral_df_sg_long[order(SSN, wavelength)]
 
+    # Load spectral library percentiles for reference band
+    spectral_percentiles <- fread("data/spectral_library_percentiles.csv")
+
 
     # Reactive value for derivative toggle
     show_derivative <- reactiveVal(FALSE)
@@ -402,7 +407,6 @@ prediction_server <- function(id) {
 
     # Reactive for current spectral plot data (handles original/derivative toggle)
     current_spectral_plot_data <- reactive({
-      # Force dependency on data and toggle
       use_derivative <- show_derivative()
       orig_df <- uploaded_spectra_df()
       sg_df <- uploaded_spectra_df_sg()
@@ -434,22 +438,51 @@ prediction_server <- function(id) {
       use_derivative <- show_derivative()
       y_title <- if (use_derivative) "First Derivative" else "Absorbance"
 
-      # Create plasma-like color palette
-      n_samples <- length(unique(plot_data$SSN))
-      plasma_colors <- viridis::plasma(n_samples)
+      all_ssns <- unique(plot_data$SSN)
+      n_total <- length(all_ssns)
+      n_initial <- min(10L, n_total)
+      plasma_colors <- viridis::plasma(n_total)
 
-      p <- plot_data |>
-        plot_ly(
-          x = ~wavelength,
-          y = ~absorbance_values,
-          color = ~SSN,
-          colors = plasma_colors,
-          customdata = ~SSN,
-          text = ~SSN,
-          type = "scatter",
-          mode = "lines",
-          source = session$ns("spectral_plot_combined")
-        ) |>
+      p <- plot_ly(source = session$ns("spectral_plot_combined"))
+
+      # Add spectral library percentile band (only for raw absorbance)
+      if (!use_derivative) {
+        p <- p |>
+          add_trace(
+            data = spectral_percentiles,
+            x = ~wavelength, y = ~p10,
+            type = "scatter", mode = "lines",
+            line = list(color = "transparent"),
+            showlegend = FALSE, hoverinfo = "skip",
+            name = "p10", inherit = FALSE
+          ) |>
+          add_trace(
+            data = spectral_percentiles,
+            x = ~wavelength, y = ~p90,
+            type = "scatter", mode = "lines",
+            fill = "tonexty",
+            fillcolor = "rgba(255, 255, 255, 0.1)",
+            line = list(color = "transparent"),
+            showlegend = FALSE, hoverinfo = "skip",
+            name = "Library P10-P90", inherit = FALSE
+          )
+      }
+
+      # Add first batch of spectra for fast initial render
+      for (i in seq_len(n_initial)) {
+        ssn <- all_ssns[i]
+        ssn_data <- plot_data[SSN == ssn]
+        p <- p |> add_trace(
+          x = ssn_data$wavelength,
+          y = ssn_data$absorbance_values,
+          type = "scatter", mode = "lines",
+          line = list(color = plasma_colors[i]),
+          customdata = ssn, text = ssn, name = ssn,
+          showlegend = FALSE, inherit = FALSE
+        )
+      }
+
+      p <- p |>
         layout(
           yaxis = list(
             title = y_title,
@@ -469,7 +502,7 @@ prediction_server <- function(id) {
           showlegend = FALSE
         )
 
-      # Initial highlight if any (using isolate to prevent re-render on selection)
+      # Highlight trace (always last)
       p <- p |> add_trace(
         x = numeric(0), y = numeric(0),
         type = "scatter", mode = "lines",
@@ -477,6 +510,37 @@ prediction_server <- function(id) {
         name = "Highlight", hoverinfo = "name",
         inherit = FALSE
       )
+
+      # Add remaining spectra via proxy after initial render
+      if (n_total > n_initial) {
+        remaining_ssns <- all_ssns[(n_initial + 1):n_total]
+        remaining_colors <- plasma_colors[(n_initial + 1):n_total]
+        n_pct <- if (!use_derivative) 2L else 0L
+        insert_at <- n_pct + n_initial # 0-indexed
+
+        session$onFlushed(function() {
+          p_proxy <- plotlyProxy("spectral_plot_combined", session)
+          traces <- lapply(seq_along(remaining_ssns), function(i) {
+            ssn <- remaining_ssns[i]
+            ssn_data <- plot_data[SSN == ssn]
+            list(
+              x = ssn_data$wavelength,
+              y = ssn_data$absorbance_values,
+              type = "scatter",
+              mode = "lines",
+              line = list(color = remaining_colors[i]),
+              customdata = rep(ssn, nrow(ssn_data)),
+              text = rep(ssn, nrow(ssn_data)),
+              name = ssn,
+              showlegend = FALSE
+            )
+          })
+          indices <- as.integer(
+            insert_at + seq_along(traces) - 1L
+          )
+          p_proxy |> plotlyProxyInvoke("addTraces", traces, indices)
+        }, once = TRUE)
+      }
 
       p |>
         event_register("plotly_relayout") |>
@@ -492,9 +556,12 @@ prediction_server <- function(id) {
         # 1. Update spectral plot via proxy
         p_proxy <- plotlyProxy("spectral_plot_combined", session)
         n_data_traces <- length(unique(current_spectral_plot_data()$SSN))
+        # Account for percentile band traces (2 traces) when showing raw absorbance
+        n_pct_traces <- if (!show_derivative()) 2L else 0L
+        highlight_idx <- as.integer(n_data_traces + n_pct_traces)
 
         if (is.null(ssn)) {
-          p_proxy |> plotlyProxyInvoke("restyle", list(x = list(numeric(0)), y = list(numeric(0))), as.integer(n_data_traces))
+          p_proxy |> plotlyProxyInvoke("restyle", list(x = list(numeric(0)), y = list(numeric(0))), highlight_idx)
           # Clear detailed selection data
           isolate(selected_row_values(NULL))
         } else {
@@ -504,7 +571,7 @@ prediction_server <- function(id) {
               x = list(h_data$wavelength),
               y = list(h_data$absorbance_values),
               name = list(paste("Selected:", ssn))
-            ), as.integer(n_data_traces))
+            ), highlight_idx)
           }
         }
 
@@ -843,15 +910,43 @@ prediction_server <- function(id) {
         return(NULL)
       }
 
+      # Desired display order
+      display_order <- c(
+        "SOC_g_kg", "TN_g_kg", "pH", "CEC_cmolc_kg",
+        "ExCa_cmolc_kg", "ExMg_cmolc_kg", "ExK_cmolc_kg",
+        "Clay_%", "Sand_%", "Silt_%"
+      )
+      # Keep only properties present in data, in the desired order
+      ordered_props <- intersect(display_order, soil_properties)
+      # Append any unexpected properties at the end
+      ordered_props <- c(ordered_props, setdiff(soil_properties, ordered_props))
+      plot_data[, Property := factor(Property, levels = ordered_props)]
+
       # Calculate stats for all properties
       stats_df <- plot_data[, .(
         Mean = mean(Value, na.rm = TRUE),
         Median = median(Value, na.rm = TRUE)
       ), by = Property]
 
+      # Force x-axis to 0-100 for texture properties (Sand, Clay, Silt)
+      texture_props <- grep("Sand|Clay|Silt", unique(as.character(plot_data$Property)), value = TRUE, ignore.case = TRUE)
+      if (length(texture_props) > 0) {
+        texture_limits <- data.frame(
+          Property = factor(rep(texture_props, each = 2), levels = levels(plot_data$Property)),
+          Value = rep(c(0, 100), times = length(texture_props))
+        )
+      } else {
+        texture_limits <- NULL
+      }
+
       # Create ggplot with facets
       p <- ggplot(plot_data, aes(x = Value)) +
         geom_density(fill = "steelblue", alpha = 0.3, color = "steelblue")
+
+      # Add invisible points to set x-axis range for texture properties
+      if (!is.null(texture_limits)) {
+        p <- p + geom_blank(data = texture_limits, aes(x = Value))
+      }
 
       # Prepare stats for mapping to get a legend
       stats_long <- melt(stats_df,
@@ -866,18 +961,20 @@ prediction_server <- function(id) {
         ) +
         scale_color_manual(values = c("Mean" = "red", "Median" = "#00ff88")) +
         scale_linetype_manual(values = c("Mean" = "dashed", "Median" = "dotted")) +
-        facet_wrap(~Property, scales = "free") +
+        facet_wrap(~Property, scales = "free", ncol = 5) +
         theme_minimal(base_size = 16) +
         theme(
-          text = element_text(color = "white"),
-          axis.text = element_text(color = "white", size = 14),
-          axis.title = element_text(color = "white", size = 16),
-          panel.grid = element_line(color = "#333333"),
-          panel.background = element_rect(fill = "transparent", color = NA),
-          plot.background = element_rect(fill = "transparent", color = NA),
-          strip.text = element_text(color = "white", face = "bold", size = 16),
+          text = element_text(color = "black"),
+          axis.text.x = element_text(color = "black", size = 12, angle = 45, hjust = 1),
+          axis.text.y = element_text(color = "black", size = 14),
+          axis.title = element_text(color = "black", size = 16),
+          panel.grid = element_line(color = "#e0e0e0"),
+          panel.background = element_rect(fill = "white", color = NA),
+          plot.background = element_rect(fill = "white", color = NA),
+          strip.text = element_text(color = "black", face = "bold", size = 16),
+          strip.background = element_rect(fill = "#f0f0f0", color = NA),
           legend.position = "bottom",
-          legend.text = element_text(color = "white", size = 14),
+          legend.text = element_text(color = "black", size = 14),
           legend.title = element_blank()
         ) +
         labs(x = NULL, y = "Density")
@@ -885,9 +982,8 @@ prediction_server <- function(id) {
       # Add highlighting if a row is selected
       vals <- selected_row_values()
       if (!is.null(vals)) {
-        # Prepare selection data for vlines
         sel_df <- data.frame(
-          Property = soil_properties,
+          Property = factor(soil_properties, levels = ordered_props),
           Value = suppressWarnings(as.numeric(sapply(soil_properties, function(x) vals[[x]])))
         )
         sel_df <- sel_df[!is.na(sel_df$Value), ]
@@ -903,14 +999,14 @@ prediction_server <- function(id) {
       # Convert to plotly
       ggplotly(p) |>
         layout(
-          paper_bgcolor = "#2d2d2d",
-          plot_bgcolor = "#2d2d2d",
+          paper_bgcolor = "white",
+          plot_bgcolor = "white",
           margin = list(l = 50, r = 20, b = 100, t = 50),
           legend = list(
             orientation = "h",
             x = 0.5, xanchor = "center",
             y = -0.2,
-            font = list(color = "white", size = 14)
+            font = list(color = "black", size = 14)
           ),
           showlegend = TRUE
         ) |>
@@ -924,6 +1020,21 @@ prediction_server <- function(id) {
         span("0", style = "color: #ffa500;")
       } else {
         span(as.character(count), style = "color: #00ff88; font-weight: bold;")
+      }
+    })
+
+    # Warning for -99 values
+    output$warning_negative_predictions <- renderUI({
+      req(prediction_results())
+      predictions <- prediction_results()
+      pred_cols <- setdiff(colnames(predictions), "SSN")
+      has_neg99 <- any(predictions[, pred_cols] == -99, na.rm = TRUE)
+      if (has_neg99) {
+        card_footer(
+          class = "bg-danger text-white",
+          icon("exclamation-triangle"),
+          " Some spectra may be noisy or have errors. Where predicted values are very uncertain they have been set to -99."
+        )
       }
     })
 
@@ -1096,10 +1207,10 @@ prediction_server <- function(id) {
           silt_val <- if (length(silt_col) > 0) as.numeric(vals[[silt_col[1]]]) else (100 - clay_val - sand_val)
 
           if (!is.na(clay_val) && !is.na(sand_val) && !is.na(silt_val)) {
-            highlight_a <- list(sand_val)
-            highlight_b <- list(clay_val)
-            highlight_c <- list(silt_val)
-            highlight_text <- list(paste0("<b>SELECTED: ", vals$SSN, "</b>"))
+            highlight_a <- list(list(sand_val))
+            highlight_b <- list(list(clay_val))
+            highlight_c <- list(list(silt_val))
+            highlight_text <- list(list(paste0("<b>SELECTED: ", vals$SSN, "</b>")))
           }
         }
 
