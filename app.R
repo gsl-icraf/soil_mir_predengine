@@ -22,13 +22,12 @@ source("modules/instructions_module.R")
 source("modules/property_info_module.R")
 source("modules/processing_info_module.R")
 
-# Set maximum upload size to 250 MB
-options(shiny.maxRequestSize = 50 * 1024^2)
+# Set maximum upload size to 100 MB
+options(shiny.maxRequestSize = 100 * 1024^2)
 # Mirai daemons
 daemons(n = 2L, dispatcher = TRUE)
 # Source prediction processing function
 source("src/spectra_process_predict.R")
-options(shiny.maxRequestSize = 50 * 1024^2)
 # Define UI with URL-aware navigation
 ui <- function(request) {
   # Parse URL to determine initial page

@@ -1,6 +1,22 @@
 ### Function to process uploaded spectra, resampling these to the
 ### required wavelength range and resolution for prediction using torch DNN models
 
+# ==============================================================================
+# DIRECT STANDARDIZATION (DS) for Alpha -> MIR Harmonization
+# ==============================================================================
+
+#' Apply Direct Standardization to transform Alpha spectra to MIR
+#' @param ds_model Fitted DS model (from fit_ds_model())
+#' @param alpha_new New Alpha spectra matrix (already resampled to MIR grid)
+#' @return Transformed spectra matching MIR characteristics
+apply_ds_model <- function(ds_model, alpha_new) {
+    alpha_centered <- sweep(alpha_new, 2, ds_model$alpha_mean, "-")
+    mir_pred <- alpha_centered %*% ds_model$F_matrix
+    mir_transformed <- sweep(mir_pred, 2, ds_model$mir_mean, "+")
+    return(mir_transformed)
+}
+
+# ==============================================================================
 # DNN model architecture (must match training architecture in mir_torch.R)
 dnn_model <- torch::nn_module(
     "DNNModel",
@@ -94,7 +110,7 @@ predict_torch <- function(model_path, new_data) {
     return(pred_unscaled)
 }
 
-process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelengths, selected_vars = NULL) {
+process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelengths, selected_vars = NULL, is_alpha = FALSE) {
     ## Average duplicated spectra based on SSN
     spectra_mir <- spectra_mir[, lapply(.SD, mean), by = SSN, .SDcols = 2:ncol(spectra_mir)]
 
@@ -118,19 +134,6 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     )
     colnames(spectra_mir_sel_resampled) <- paste0("w", wavebands_ref)
 
-    ## Apply Alpha bias correction (Alpha -> MIR) on resampled spectra
-    bias_model_path <- file.path("models", "spectra_process", "alpha_bias_correction.rds")
-    if (file.exists(bias_model_path)) {
-        bias_model <- readRDS(bias_model_path)
-        bias_cols <- paste0("w", names(bias_model$bias))
-        matched_cols <- intersect(bias_cols, colnames(spectra_mir_sel_resampled))
-        if (length(matched_cols) > 0) {
-            bias_vec <- bias_model$bias[gsub("^w", "", matched_cols)]
-            spectra_mir_sel_resampled[, matched_cols] <-
-                sweep(spectra_mir_sel_resampled[, matched_cols], 2, bias_vec, "-")
-        }
-    }
-
     ## SG first derivative on the resampled spectra (matches reference modeling)
     # p=2, w=11, m=1
     spectra_mir_sel_resampled_sg <- savitzkyGolay(
@@ -141,6 +144,35 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
         # Recover names: SG with w=11 drops 5 cols from each end
         sg_cols <- colnames(spectra_mir_sel_resampled)[6:(ncol(spectra_mir_sel_resampled) - 5)]
         colnames(spectra_mir_sel_resampled_sg) <- sg_cols
+    }
+
+    ## Apply Alpha -> MIR harmonization using Direct Standardization (DS)
+    ## NOTE: DS model was trained on SG derivatives, so apply AFTER derivative step
+    if (is_alpha) {
+        ds_model_path <- file.path("models", "spectra_process", "harmonization_models.rds")
+        if (file.exists(ds_model_path)) {
+            harmonization <- readRDS(ds_model_path)
+            ds_model <- harmonization$DS$model
+
+            # Get column names that match the DS model features
+            ds_feature_names <- harmonization$feature_names
+            matched_cols <- intersect(colnames(spectra_mir_sel_resampled_sg), ds_feature_names)
+
+            if (length(matched_cols) == length(ds_feature_names)) {
+                # Apply DS harmonization to SG derivatives
+                alpha_mat <- spectra_mir_sel_resampled_sg[, ds_feature_names, drop = FALSE]
+                spectra_mir_sel_resampled_sg[, ds_feature_names] <- apply_ds_model(ds_model, alpha_mat)
+                message("Applied Direct Standardization harmonization for Alpha spectra")
+            } else {
+                warning(sprintf(
+                    "DS model expects %d features but only %d matched. Skipping harmonization.",
+                    length(ds_feature_names), length(matched_cols)
+                ))
+            }
+        } else {
+            warning("Alpha DS harmonization model not found at: ", ds_model_path,
+                    ". Run train_ds_harmonization.R to create it.")
+        }
     }
 
     ## Output table

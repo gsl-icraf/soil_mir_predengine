@@ -128,6 +128,22 @@ prediction_ui <- function(id) {
                 color = "#00ff88",
                 size = 0.8
               ),
+              # Alpha spectra info card
+              conditionalPanel(
+                condition = "output.is_alpha_spectra == true",
+                ns = ns,
+                div(
+                  class = "mt-2 p-2 rounded",
+                  style = "background-color: rgba(255, 165, 0, 0.1); border: 1px solid rgba(255, 165, 0, 0.3);",
+                  div(
+                    class = "d-flex align-items-center",
+                    icon("info-circle", class = "me-2", style = "color: #ffa500;"),
+                    span("Alpha spectra detected: Absorbance values are systematically higher than the ICRAF master spectral library (Invenio; shaded gray area in the graph above). This is corrected during prediction when derivatives are computed and adjusted using Direct Standardization.",
+                      style = "color: #ffa500; font-size: 1.2em;"
+                    )
+                  )
+                )
+              ),
               conditionalPanel(
                 condition = "output.spectra_ready == true",
                 ns = ns,
@@ -245,6 +261,25 @@ prediction_ui <- function(id) {
             ),
             card_body(
               plotlyOutput(ns("prediction_plot"), height = "600px")
+            )
+          ),
+
+          # Property relationship scatter plots
+          card(
+            full_screen = TRUE,
+            class = "spectral-card mt-3",
+            card_header(
+              icon("chart-scatter"), " Property Relationships",
+              class = "bg-gradient text-white"
+            ),
+            card_body(
+              layout_columns(
+                col_widths = c(3, 3, 3, 3),
+                plotlyOutput(ns("scatter_soc_tn"), height = "350px"),
+                plotlyOutput(ns("scatter_sand_soc"), height = "350px"),
+                plotlyOutput(ns("scatter_clay_soc"), height = "350px"),
+                plotlyOutput(ns("scatter_ph_cec"), height = "350px")
+              )
             )
           )
         )
@@ -378,7 +413,8 @@ prediction_server <- function(id) {
     spectral_df_sg_long <- spectral_df_sg_long[order(SSN, wavelength)]
 
     # Load spectral library percentiles for reference band
-    spectral_percentiles <- fread("data/spectral_library_percentiles.csv")
+    spectral_percentiles <- fread("data/spectral_quantiles.csv")
+    setorder(spectral_percentiles, wavenumber)
 
 
     # Reactive value for derivative toggle
@@ -429,6 +465,20 @@ prediction_server <- function(id) {
           plot_data <- spectral_df_long
         }
       }
+
+      # Filter out PCA outliers if available
+      tryCatch(
+        {
+          outliers <- pca_outlier_ssns()
+          if (length(outliers) > 0) {
+            plot_data <- plot_data[!SSN %in% outliers]
+          }
+        },
+        error = function(e) {
+          # PCA not yet computed, show all spectra
+        }
+      )
+
       plot_data
     })
 
@@ -450,21 +500,21 @@ prediction_server <- function(id) {
         p <- p |>
           add_trace(
             data = spectral_percentiles,
-            x = ~wavelength, y = ~p10,
+            x = ~wavenumber, y = ~q05,
             type = "scatter", mode = "lines",
             line = list(color = "transparent"),
             showlegend = FALSE, hoverinfo = "skip",
-            name = "p10", inherit = FALSE
+            name = "q05", inherit = FALSE
           ) |>
           add_trace(
             data = spectral_percentiles,
-            x = ~wavelength, y = ~p90,
+            x = ~wavenumber, y = ~q95,
             type = "scatter", mode = "lines",
             fill = "tonexty",
-            fillcolor = "rgba(255, 255, 255, 0.1)",
+            fillcolor = "rgba(255, 255, 255, 0.2)",
             line = list(color = "transparent"),
             showlegend = FALSE, hoverinfo = "skip",
-            name = "Library P10-P90", inherit = FALSE
+            name = "Library Q10-Q90", inherit = FALSE
           )
       }
 
@@ -614,6 +664,7 @@ prediction_server <- function(id) {
     uploaded_spectra_resampled_df <- reactiveVal(NULL)
     uploaded_spectra_resampled_df_sg <- reactiveVal(NULL)
     spectra_count <- reactiveVal(0)
+    uploaded_instrument_type <- reactiveVal(NULL)
 
     # Reactive values for prediction
     prediction_loading <- reactiveVal(FALSE)
@@ -652,6 +703,7 @@ prediction_server <- function(id) {
             # Process uploaded spectral data
             total_files <- length(opus_files)
             spectra_list <- vector("list", total_files)
+            instrument_types <- character(total_files)
 
             for (i in seq_along(opus_files)) {
               tryCatch(
@@ -659,6 +711,9 @@ prediction_server <- function(id) {
                   s <- opus_read(opus_files[i])
                   dt <- data.table(cbind(s$metadata$sample_id, s$spec))
                   spectra_list[[i]] <- dt
+                  if (!is.null(s$metadata$instr_name_range)) {
+                    instrument_types[i] <- s$metadata$instr_name_range
+                  }
                 },
                 error = function(e) {
                   warning(paste("Skipping file", basename(opus_files[i]), ":", e$message))
@@ -725,8 +780,18 @@ prediction_server <- function(id) {
             uploaded_spectral_df_sg <- savitzkyGolay(X = uploaded_spectral_df[, 2:ncol(uploaded_spectral_df)], p = 3, w = 11, m = 1)
 
             # Store processed data in reactive values
+            # Store processed data in reactive values
             uploaded_spectra_df(uploaded_spectral_df)
             uploaded_spectra_df_sg(data.table(SSN = uploaded_spectral_df$SSN, uploaded_spectral_df_sg))
+
+            # Determine instrument type
+            # Check if any file indicates "Alpha" in instrument name
+            is_alpha <- any(grepl("Alpha", instrument_types, ignore.case = TRUE))
+            uploaded_instrument_type(if (is_alpha) "Alpha" else "Other")
+            if (is_alpha) {
+              showNotification("Bruker Alpha instrument detected. Applying specific bias correction.", type = "message", duration = 5)
+            }
+
             spectra_count(length(unique(uploaded_spectra$SSN)))
             spectra_processed(TRUE) # Enable predict button
 
@@ -778,7 +843,8 @@ prediction_server <- function(id) {
           # Call the actual prediction function
           results <- process_spectra_predict(
             spectra_mir = uploaded_spectra_df(),
-            selected_vars = input$selected_properties
+            selected_vars = input$selected_properties,
+            is_alpha = (uploaded_instrument_type() == "Alpha")
           )
           predictions <- results$predictions
 
@@ -1013,6 +1079,110 @@ prediction_server <- function(id) {
         config(displayModeBar = FALSE)
     })
 
+    # Helper function for property relationship scatter plots
+    render_property_scatter <- function(predictions, x_var, y_var, x_label, y_label, selected_vals = NULL) {
+      # Find matching columns (handle different naming conventions)
+      x_col <- grep(x_var, colnames(predictions), value = TRUE, ignore.case = TRUE)[1]
+      y_col <- grep(y_var, colnames(predictions), value = TRUE, ignore.case = TRUE)[1]
+
+      if (is.na(x_col) || is.na(y_col)) {
+        return(plot_ly() |>
+          layout(
+            title = list(
+              text = paste("Requires", x_var, "and", y_var, "predictions"),
+              font = list(color = "grey", size = 12)
+            ),
+            paper_bgcolor = "white", plot_bgcolor = "white"
+          ))
+      }
+
+      plot_data <- data.frame(
+        x = as.numeric(predictions[[x_col]]),
+        y = as.numeric(predictions[[y_col]]),
+        SSN = predictions$SSN
+      )
+      # Exclude NA and -99 (uncertain/invalid) values
+      plot_data <- plot_data[!is.na(plot_data$x) & !is.na(plot_data$y) &
+        plot_data$x != -99 & plot_data$y != -99, ]
+
+      p <- plot_ly(plot_data,
+        x = ~x, y = ~y, type = "scatter", mode = "markers",
+        text = ~SSN, hovertemplate = "<b>%{text}</b><br>%{xaxis.title.text}: %{x:.2f}<br>%{yaxis.title.text}: %{y:.2f}<extra></extra>",
+        marker = list(
+          color = "#8B4513", size = 8, opacity = 0.7,
+          line = list(color = "white", width = 1)
+        )
+      )
+
+      # Add highlight point if selected
+      if (!is.null(selected_vals)) {
+        sel_x <- as.numeric(selected_vals[[x_col]])
+        sel_y <- as.numeric(selected_vals[[y_col]])
+        if (!is.na(sel_x) && !is.na(sel_y)) {
+          p <- p |> add_trace(
+            x = sel_x, y = sel_y, type = "scatter", mode = "markers",
+            marker = list(
+              color = "orange", size = 14, opacity = 1,
+              line = list(color = "white", width = 2)
+            ),
+            hoverinfo = "skip", showlegend = FALSE
+          )
+        }
+      }
+
+      p |>
+        layout(
+          xaxis = list(
+            title = x_label, gridcolor = "#e0e0e0", color = "black",
+            titlefont = list(size = 14), tickfont = list(size = 12)
+          ),
+          yaxis = list(
+            title = y_label, gridcolor = "#e0e0e0", color = "black",
+            titlefont = list(size = 14), tickfont = list(size = 12)
+          ),
+          paper_bgcolor = "white", plot_bgcolor = "white",
+          margin = list(l = 60, r = 20, b = 50, t = 30),
+          showlegend = FALSE
+        ) |>
+        config(displayModeBar = FALSE)
+    }
+
+    # SOC vs TN scatter plot
+    output$scatter_soc_tn <- renderPlotly({
+      req(prediction_results())
+      render_property_scatter(
+        prediction_results(), "SOC", "TN",
+        "SOC (g/kg)", "TN (g/kg)", selected_row_values()
+      )
+    })
+
+    # Sand vs SOC scatter plot
+    output$scatter_sand_soc <- renderPlotly({
+      req(prediction_results())
+      render_property_scatter(
+        prediction_results(), "Sand", "SOC",
+        "Sand (%)", "SOC (g/kg)", selected_row_values()
+      )
+    })
+
+    # Clay vs SOC scatter plot
+    output$scatter_clay_soc <- renderPlotly({
+      req(prediction_results())
+      render_property_scatter(
+        prediction_results(), "Clay", "SOC",
+        "Clay (%)", "SOC (g/kg)", selected_row_values()
+      )
+    })
+
+    # pH vs CEC scatter plot
+    output$scatter_ph_cec <- renderPlotly({
+      req(prediction_results())
+      render_property_scatter(
+        prediction_results(), "pH", "CEC",
+        "pH", "CEC (cmolc/kg)", selected_row_values()
+      )
+    })
+
     # Spectra count display
     output$spectra_count_display <- renderUI({
       count <- spectra_count()
@@ -1061,6 +1231,12 @@ prediction_server <- function(id) {
       spectra_processed()
     })
     outputOptions(output, "spectra_ready", suspendWhenHidden = FALSE)
+
+    # Control visibility of Alpha spectra info card
+    output$is_alpha_spectra <- reactive({
+      !is.null(uploaded_instrument_type()) && uploaded_instrument_type() == "Alpha"
+    })
+    outputOptions(output, "is_alpha_spectra", suspendWhenHidden = FALSE)
 
     # Control visibility of download button
     output$predictions_ready <- reactive({
@@ -1458,6 +1634,36 @@ prediction_server <- function(id) {
       dt_scores <- as.data.table(pca_res)
       dt_scores[, SSN := ssn_labels]
       dt_scores
+    })
+
+    # Identify PCA outliers (samples outside reference PCA space)
+    pca_outlier_ssns <- reactive({
+      req(uploaded_pca_scores(), pca_scores_ref())
+
+      uploaded <- uploaded_pca_scores()
+      ref <- pca_scores_ref()
+
+      # Calculate bounds from reference data (99.5th percentile)
+      pc_cols <- c("PC1", "PC2", "PC3")
+      bounds <- lapply(pc_cols, function(pc) {
+        vals <- ref[[pc]]
+        list(
+          lower = quantile(vals, 0.0025, na.rm = TRUE),
+          upper = quantile(vals, 0.9975, na.rm = TRUE)
+        )
+      })
+      names(bounds) <- pc_cols
+
+      # Identify outliers (outside bounds on any PC)
+      outlier_mask <- rep(FALSE, nrow(uploaded))
+      for (pc in pc_cols) {
+        pc_vals <- uploaded[[pc]]
+        outlier_mask <- outlier_mask |
+          (pc_vals < bounds[[pc]]$lower) |
+          (pc_vals > bounds[[pc]]$upper)
+      }
+
+      uploaded$SSN[outlier_mask]
     })
 
     # Helper function for PCA contour plots with overlay
