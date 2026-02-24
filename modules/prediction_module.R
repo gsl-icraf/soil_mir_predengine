@@ -367,8 +367,18 @@ prediction_server <- function(id) {
     # Process uploaded spectral data
     if (length(sample_spectra) > 0) {
       s_list <- lapply(sample_spectra, function(f) {
-        s_res <- opus_read(f)
-        cbind(s_res$metadata$sample_id, s_res$spec)
+        s_res <- read_opus(dsn = f)[[1]]
+        raw_id <- s_res$basic_metadata$opus_sample_name
+        if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+          raw_id <- tools::file_path_sans_ext(basename(f))
+        }
+        spec_block <- s_res$ab_no_atm_comp %||% s_res$ab
+        if (is.null(spec_block)) stop("No spectral block (ab_no_atm_comp or ab) found in file")
+        spec_mat <- matrix(spec_block$data, nrow = 1,
+          dimnames = list(NULL, as.character(spec_block$wavenumbers)))
+        res <- cbind(raw_id, spec_mat)
+        colnames(res)[1] <- "V1"
+        res
       })
       spectra <- as.data.frame(do.call(rbind, s_list))
 
@@ -708,14 +718,35 @@ prediction_server <- function(id) {
             for (i in seq_along(opus_files)) {
               tryCatch(
                 {
-                  s <- opus_read(opus_files[i])
-                  dt <- data.table(cbind(s$metadata$sample_id, s$spec))
+                  s <- read_opus(dsn = opus_files[i])[[1]]
+                  raw_id <- s$basic_metadata$opus_sample_name
+                  if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+                    raw_id <- tools::file_path_sans_ext(basename(opus_files[i]))
+                    if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+                      stop("INVALID_SAMPLE_ID_CRITICAL")
+                    }
+                  }
+
+                  spec_block <- s$ab_no_atm_comp %||% s$ab
+                  if (is.null(spec_block)) stop("No spectral block (ab_no_atm_comp or ab) found in file")
+                  spec_mat <- matrix(spec_block$data, nrow = 1,
+                    dimnames = list(NULL, as.character(spec_block$wavenumbers)))
+                  dt <- data.table(cbind(raw_id, spec_mat))
+                  setnames(dt, 1, "V1")
+
+                  # Capture filename for potential fallback
+                  dt[, Filename := basename(opus_files[i])]
+
                   spectra_list[[i]] <- dt
-                  if (!is.null(s$metadata$instr_name_range)) {
-                    instrument_types[i] <- s$metadata$instr_name_range
+                  ins_val <- s$instrument$parameters$INS$parameter_value
+                  if (!is.null(ins_val)) {
+                    instrument_types[i] <- ins_val
                   }
                 },
                 error = function(e) {
+                  if (grepl("INVALID_SAMPLE_ID_CRITICAL", e$message)) {
+                    stop(e)
+                  }
                   warning(paste("Skipping file", basename(opus_files[i]), ":", e$message))
                 }
               )
@@ -756,11 +787,29 @@ prediction_server <- function(id) {
               spectra_list <- spectra_list[keep_idx]
             }
 
-            uploaded_spectra <- rbindlist(spectra_list)
+            uploaded_spectra <- rbindlist(spectra_list, fill = TRUE)
 
             if (nrow(uploaded_spectra) == 0) {
               showNotification("Failed to read spectral data from uploaded files.", type = "error")
               return()
+            }
+
+            # Fallback Check: If all files have the same SSN (e.g. "Sample"), use filename
+            # Check uniqueN on V1 (Raw SSN)
+            if (uniqueN(uploaded_spectra$V1) == 1 && nrow(uploaded_spectra) > 1) {
+              common_id <- uploaded_spectra$V1[1]
+              showNotification(
+                paste0("⚠️ All files share the same Sample ID ('", common_id, "'). using filenames instead."),
+                type = "warning",
+                duration = 10
+              )
+              # Replace V1 with filename (no extension)
+              uploaded_spectra[, V1 := tools::file_path_sans_ext(Filename)]
+            }
+
+            # Remove Filename column before proceeding
+            if ("Filename" %in% names(uploaded_spectra)) {
+              uploaded_spectra[, Filename := NULL]
             }
 
             uploaded_spectra[, SSN := V1]
@@ -804,7 +853,27 @@ prediction_server <- function(id) {
           unlink(extract_dir, recursive = TRUE)
         },
         error = function(e) {
-          showNotification(paste("Error processing files:", e$message), type = "error")
+          if (grepl("INVALID_SAMPLE_ID_CRITICAL", e$message)) {
+            showModal(modalDialog(
+              title = "Invalid Sample ID",
+              "The selected spectral files do not contain valid Sample IDs in their metadata, and their file names cannot be used as a valid fallback (Sample IDs must start with a letter and be at least 8 characters long).",
+              easyClose = TRUE,
+              footer = modalButton("Close")
+            ))
+            # Reset session state
+            uploaded_spectra_df(NULL)
+            uploaded_spectra_df_sg(NULL)
+            uploaded_spectra_resampled_df(NULL)
+            uploaded_spectra_resampled_df_sg(NULL)
+            spectra_count(0)
+            prediction_results(NULL)
+            spectra_processed(FALSE)
+            prediction_loading(FALSE)
+            selected_row_values(NULL)
+            shinyjs::reset("spectra_file")
+          } else {
+            showNotification(paste("Error processing files:", e$message), type = "error")
+          }
         }
       )
     })
@@ -952,29 +1021,13 @@ prediction_server <- function(id) {
       }
     })
 
-    # Soil property density plots
-    # Soil property density plots
+    # Soil property density plots (native plotly - avoids ggplotly/geom_density bug)
     output$prediction_plot <- renderPlotly({
       req(prediction_results())
       predictions <- prediction_results()
 
-      # Define soil properties to plot (excluding SSN)
       soil_properties <- colnames(predictions)[-1]
-      if (length(soil_properties) == 0) {
-        return(NULL)
-      }
-
-      # Reshape to long format for ggplot
-      plot_data <- melt.data.table(as.data.table(predictions),
-        id.vars = "SSN",
-        variable.name = "Property", value.name = "Value"
-      )
-      plot_data[, Value := as.numeric(Value)]
-      plot_data <- plot_data[!is.na(Value)]
-
-      if (nrow(plot_data) == 0) {
-        return(NULL)
-      }
+      if (length(soil_properties) == 0) return(NULL)
 
       # Desired display order
       display_order <- c(
@@ -982,96 +1035,112 @@ prediction_server <- function(id) {
         "ExCa_cmolc_kg", "ExMg_cmolc_kg", "ExK_cmolc_kg",
         "Clay_%", "Sand_%", "Silt_%"
       )
-      # Keep only properties present in data, in the desired order
       ordered_props <- intersect(display_order, soil_properties)
-      # Append any unexpected properties at the end
       ordered_props <- c(ordered_props, setdiff(soil_properties, ordered_props))
-      plot_data[, Property := factor(Property, levels = ordered_props)]
 
-      # Calculate stats for all properties
-      stats_df <- plot_data[, .(
-        Mean = mean(Value, na.rm = TRUE),
-        Median = median(Value, na.rm = TRUE)
-      ), by = Property]
-
-      # Force x-axis to 0-100 for texture properties (Sand, Clay, Silt)
-      texture_props <- grep("Sand|Clay|Silt", unique(as.character(plot_data$Property)), value = TRUE, ignore.case = TRUE)
-      if (length(texture_props) > 0) {
-        texture_limits <- data.frame(
-          Property = factor(rep(texture_props, each = 2), levels = levels(plot_data$Property)),
-          Value = rep(c(0, 100), times = length(texture_props))
-        )
-      } else {
-        texture_limits <- NULL
-      }
-
-      # Create ggplot with facets
-      p <- ggplot(plot_data, aes(x = Value)) +
-        geom_density(fill = "steelblue", alpha = 0.3, color = "steelblue")
-
-      # Add invisible points to set x-axis range for texture properties
-      if (!is.null(texture_limits)) {
-        p <- p + geom_blank(data = texture_limits, aes(x = Value))
-      }
-
-      # Prepare stats for mapping to get a legend
-      stats_long <- melt(stats_df,
-        id.vars = "Property",
-        variable.name = "Statistic", value.name = "StatValue"
-      )
-
-      p <- p +
-        geom_vline(
-          data = stats_long, aes(xintercept = StatValue, color = Statistic, linetype = Statistic),
-          size = 0.8
-        ) +
-        scale_color_manual(values = c("Mean" = "red", "Median" = "#00ff88")) +
-        scale_linetype_manual(values = c("Mean" = "dashed", "Median" = "dotted")) +
-        facet_wrap(~Property, scales = "free", ncol = 5) +
-        theme_minimal(base_size = 16) +
-        theme(
-          text = element_text(color = "black"),
-          axis.text.x = element_text(color = "black", size = 12, angle = 45, hjust = 1),
-          axis.text.y = element_text(color = "black", size = 14),
-          axis.title = element_text(color = "black", size = 16),
-          panel.grid = element_line(color = "#e0e0e0"),
-          panel.background = element_rect(fill = "white", color = NA),
-          plot.background = element_rect(fill = "white", color = NA),
-          strip.text = element_text(color = "black", face = "bold", size = 16),
-          strip.background = element_rect(fill = "#f0f0f0", color = NA),
-          legend.position = "bottom",
-          legend.text = element_text(color = "black", size = 14),
-          legend.title = element_blank()
-        ) +
-        labs(x = NULL, y = "Density")
-
-      # Add highlighting if a row is selected
+      texture_props <- grep("Sand|Clay|Silt", ordered_props, value = TRUE, ignore.case = TRUE)
       vals <- selected_row_values()
-      if (!is.null(vals)) {
-        sel_df <- data.frame(
-          Property = factor(soil_properties, levels = ordered_props),
-          Value = suppressWarnings(as.numeric(sapply(soil_properties, function(x) vals[[x]])))
-        )
-        sel_df <- sel_df[!is.na(sel_df$Value), ]
+      ncols <- min(5L, length(ordered_props))
 
-        if (nrow(sel_df) > 0) {
-          p <- p + geom_vline(
-            data = sel_df, aes(xintercept = Value),
-            color = "orange", size = 1.2, linetype = "solid"
+      # Build one plotly panel per property
+      plots <- lapply(seq_along(ordered_props), function(i) {
+        prop <- ordered_props[i]
+        prop_vals <- suppressWarnings(as.numeric(predictions[[prop]]))
+        prop_vals <- prop_vals[!is.na(prop_vals) & prop_vals != -99]
+        is_first <- i == 1
+        is_left_col <- (i - 1L) %% ncols == 0L
+
+        # Title annotation - subplot() transforms xref/yref="paper" to each panel's domain
+        title_annot <- list(
+          text = paste0("<b>", prop, "</b>"),
+          x = 0.5, xref = "paper",
+          y = 1.0, yref = "paper",
+          xanchor = "center", yanchor = "bottom",
+          showarrow = FALSE,
+          font = list(size = 12, color = "black")
+        )
+
+        if (length(prop_vals) < 2) {
+          return(
+            plot_ly() |>
+              layout(
+                xaxis = list(title = "", color = "black", gridcolor = "#e0e0e0",
+                  tickfont = list(size = 10, color = "black")),
+                yaxis = list(title = "", color = "black", gridcolor = "#e0e0e0",
+                  showticklabels = is_left_col),
+                annotations = list(
+                  title_annot,
+                  list(text = "Insufficient data", x = 0.5, y = 0.5,
+                    xref = "paper", yref = "paper", showarrow = FALSE,
+                    font = list(color = "grey", size = 11))
+                )
+              )
           )
         }
-      }
 
-      # Convert to plotly
-      ggplotly(p) |>
+        dens <- density(prop_vals)
+        mean_v <- mean(prop_vals)
+        med_v <- median(prop_vals)
+        max_y <- max(dens$y)
+        x_range <- if (prop %in% texture_props) list(range = c(0, 100)) else list()
+
+        p <- plot_ly() |>
+          add_trace(
+            x = dens$x, y = dens$y,
+            type = "scatter", mode = "lines",
+            fill = "tozeroy",
+            fillcolor = "rgba(70, 130, 180, 0.3)",
+            line = list(color = "steelblue", width = 1.5),
+            showlegend = FALSE, name = prop
+          ) |>
+          add_segments(
+            x = mean_v, xend = mean_v, y = 0, yend = max_y,
+            line = list(color = "red", dash = "dash", width = 1.5),
+            showlegend = is_first, name = "Mean", legendgroup = "Mean"
+          ) |>
+          add_segments(
+            x = med_v, xend = med_v, y = 0, yend = max_y,
+            line = list(color = "#00ff88", dash = "dot", width = 1.5),
+            showlegend = is_first, name = "Median", legendgroup = "Median"
+          )
+
+        if (!is.null(vals)) {
+          sel_v <- suppressWarnings(as.numeric(vals[[prop]]))
+          if (!is.na(sel_v) && sel_v != -99) {
+            p <- p |> add_segments(
+              x = sel_v, xend = sel_v, y = 0, yend = max_y,
+              line = list(color = "orange", width = 2),
+              showlegend = is_first, name = "Selected", legendgroup = "Selected"
+            )
+          }
+        }
+
+        p |> layout(
+          xaxis = c(list(
+            title = "", color = "black", gridcolor = "#e0e0e0",
+            tickfont = list(size = 10, color = "black"), tickangle = -45, nticks = 5
+          ), x_range),
+          yaxis = list(
+            title = if (is_left_col) "Density" else "",
+            color = "black", gridcolor = "#e0e0e0",
+            showticklabels = is_left_col,
+            tickfont = list(size = 9, color = "black"), nticks = 4
+          ),
+          annotations = list(title_annot)
+        )
+      })
+
+      nrows <- ceiling(length(ordered_props) / ncols)
+
+      subplot(plots, nrows = nrows, shareX = FALSE, shareY = FALSE, margin = 0.08) |>
         layout(
           paper_bgcolor = "white",
           plot_bgcolor = "white",
-          margin = list(l = 50, r = 20, b = 100, t = 50),
+          margin = list(l = 50, r = 20, b = 80, t = 50),
           legend = list(
             orientation = "h",
             x = 0.5, xanchor = "center",
-            y = -0.2,
+            y = -0.08,
             font = list(color = "black", size = 14)
           ),
           showlegend = TRUE
