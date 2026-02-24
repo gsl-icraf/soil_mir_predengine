@@ -708,17 +708,22 @@ prediction_server <- function(id) {
               return()
             }
 
-            incProgress(0.1, detail = paste("Found", length(opus_files), "files"))
+            incProgress(0.1, detail = paste("Found", length(opus_files), "files — reading..."))
 
-            # Process uploaded spectral data
+            # Batch-read all files in one call (opusreader2 uses mirai internally when
+            # daemons are configured, avoiding repeated per-file call overhead)
             total_files <- length(opus_files)
+            all_spectra <- read_opus(dsn = opus_files)
+
+            incProgress(0.4, detail = paste("Extracting spectra from", total_files, "files..."))
+
             spectra_list <- vector("list", total_files)
             instrument_types <- character(total_files)
 
             for (i in seq_along(opus_files)) {
               tryCatch(
                 {
-                  s <- read_opus(dsn = opus_files[i])[[1]]
+                  s <- all_spectra[[i]]
                   raw_id <- s$basic_metadata$opus_sample_name
                   if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
                     raw_id <- tools::file_path_sans_ext(basename(opus_files[i]))
@@ -750,13 +755,6 @@ prediction_server <- function(id) {
                   warning(paste("Skipping file", basename(opus_files[i]), ":", e$message))
                 }
               )
-
-              # Update progress every 10 files or at the end
-              if (i %% 10 == 0 || i == total_files) {
-                incProgress(0.5 / total_files * min(i, 10),
-                  detail = paste("Processing file", i, "of", total_files)
-                )
-              }
             }
 
             # Combine spectra - use majority wavenumber layout, skip incompatible files
