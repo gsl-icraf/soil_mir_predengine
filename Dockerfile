@@ -43,8 +43,8 @@ RUN Rscript -e "install.packages(c( \
 ## Install R torch package dependencies (libtorch)
 RUN Rscript -e "torch::install_torch()"
 
-# R packges from R packages from github
-RUN Rscript -e "remotes::install_github(c('spectral-cockpit/opusreader2', 'pierreroudier/opusreader'))" 
+# opusreader2 from r-universe (stable binaries, no GitHub rate limits)
+RUN Rscript -e "install.packages('opusreader2', repos = c('https://spectral-cockpit.r-universe.dev', 'https://cran.rstudio.com'))"
 
 # User configuration
 RUN useradd -m pred_engine_user
