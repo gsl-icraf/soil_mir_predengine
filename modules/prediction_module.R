@@ -251,18 +251,8 @@ prediction_ui <- function(id) {
             )
           ),
 
-          # Density plots card
-          card(
-            full_screen = TRUE,
-            class = "spectral-card",
-            card_header(
-              icon("chart-area"), " Soil Property Distributions",
-              class = "bg-gradient text-white"
-            ),
-            card_body(
-              plotlyOutput(ns("prediction_plot"), height = "600px")
-            )
-          ),
+          # Density plot cards — grid built dynamically by the server
+          uiOutput(ns("density_plots_ui")),
 
           # Property relationship scatter plots
           card(
@@ -275,10 +265,10 @@ prediction_ui <- function(id) {
             card_body(
               layout_columns(
                 col_widths = c(3, 3, 3, 3),
-                plotlyOutput(ns("scatter_soc_tn"), height = "350px"),
-                plotlyOutput(ns("scatter_sand_soc"), height = "350px"),
-                plotlyOutput(ns("scatter_clay_soc"), height = "350px"),
-                plotlyOutput(ns("scatter_ph_cec"), height = "350px")
+                plotlyOutput(ns("scatter_soc_tn"), height = "250px", width = "100%"),
+                plotlyOutput(ns("scatter_sand_soc"), height = "250px", width = "100%"),
+                plotlyOutput(ns("scatter_clay_soc"), height = "250px", width = "100%"),
+                plotlyOutput(ns("scatter_ph_cec"), height = "250px", width = "100%")
               )
             )
           )
@@ -367,15 +357,17 @@ prediction_server <- function(id) {
     # Process uploaded spectral data
     if (length(sample_spectra) > 0) {
       s_list <- lapply(sample_spectra, function(f) {
-        s_res <- read_opus(dsn = f)[[1]]
+        s_res <- suppressWarnings(read_opus(dsn = f))[[1]]
         raw_id <- s_res$basic_metadata$opus_sample_name
         if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
           raw_id <- tools::file_path_sans_ext(basename(f))
         }
         spec_block <- s_res$ab_no_atm_comp %||% s_res$ab
         if (is.null(spec_block)) stop("No spectral block (ab_no_atm_comp or ab) found in file")
-        spec_mat <- matrix(spec_block$data, nrow = 1,
-          dimnames = list(NULL, as.character(spec_block$wavenumbers)))
+        spec_mat <- matrix(spec_block$data,
+          nrow = 1,
+          dimnames = list(NULL, as.character(spec_block$wavenumbers))
+        )
         res <- cbind(raw_id, spec_mat)
         colnames(res)[1] <- "V1"
         res
@@ -492,14 +484,21 @@ prediction_server <- function(id) {
       plot_data
     })
 
+    # Cap plotted spectra at 50 to keep the chart responsive
+    displayed_ssns <- reactive({
+      all_ssns <- unique(current_spectral_plot_data()$SSN)
+      if (length(all_ssns) > 50L) sample(all_ssns, 50L) else all_ssns
+    })
+
     ### Render combined plot
     output$spectral_plot_combined <- renderPlotly({
       plot_data <- current_spectral_plot_data()
       use_derivative <- show_derivative()
       y_title <- if (use_derivative) "First Derivative" else "Absorbance"
 
-      all_ssns <- unique(plot_data$SSN)
+      all_ssns <- displayed_ssns()
       n_total <- length(all_ssns)
+      n_uploaded <- length(unique(plot_data$SSN))
       n_initial <- min(10L, n_total)
       plasma_colors <- viridis::plasma(n_total)
 
@@ -542,6 +541,18 @@ prediction_server <- function(id) {
         )
       }
 
+      subsample_note <- if (n_uploaded > 50L) {
+        list(list(
+          text = paste0("Showing 50 of ", n_uploaded, " spectra"),
+          x = 1, xref = "paper", xanchor = "right",
+          y = 1, yref = "paper", yanchor = "top",
+          showarrow = FALSE,
+          font = list(color = "#aaaaaa", size = 12)
+        ))
+      } else {
+        list()
+      }
+
       p <- p |>
         layout(
           yaxis = list(
@@ -559,7 +570,8 @@ prediction_server <- function(id) {
           plot_bgcolor = "#2d2d2d",
           paper_bgcolor = "#2d2d2d",
           font = list(color = "white", size = 16),
-          showlegend = FALSE
+          showlegend = FALSE,
+          annotations = subsample_note
         )
 
       # Highlight trace (always last)
@@ -615,7 +627,7 @@ prediction_server <- function(id) {
 
         # 1. Update spectral plot via proxy
         p_proxy <- plotlyProxy("spectral_plot_combined", session)
-        n_data_traces <- length(unique(current_spectral_plot_data()$SSN))
+        n_data_traces <- length(displayed_ssns())
         # Account for percentile band traces (2 traces) when showing raw absorbance
         n_pct_traces <- if (!show_derivative()) 2L else 0L
         highlight_idx <- as.integer(n_data_traces + n_pct_traces)
@@ -713,7 +725,7 @@ prediction_server <- function(id) {
             # Batch-read all files in one call (opusreader2 uses mirai internally when
             # daemons are configured, avoiding repeated per-file call overhead)
             total_files <- length(opus_files)
-            all_spectra <- read_opus(dsn = opus_files)
+            all_spectra <- suppressWarnings(read_opus(dsn = opus_files))
 
             incProgress(0.4, detail = paste("Extracting spectra from", total_files, "files..."))
 
@@ -734,8 +746,10 @@ prediction_server <- function(id) {
 
                   spec_block <- s$ab_no_atm_comp %||% s$ab
                   if (is.null(spec_block)) stop("No spectral block (ab_no_atm_comp or ab) found in file")
-                  spec_mat <- matrix(spec_block$data, nrow = 1,
-                    dimnames = list(NULL, as.character(spec_block$wavenumbers)))
+                  spec_mat <- matrix(spec_block$data,
+                    nrow = 1,
+                    dimnames = list(NULL, as.character(spec_block$wavenumbers))
+                  )
                   dt <- data.table(cbind(raw_id, spec_mat))
                   setnames(dt, 1, "V1")
 
@@ -967,11 +981,23 @@ prediction_server <- function(id) {
           prediction_loading(FALSE)
           shinyjs::enable("predict_btn")
           shinyjs::html("predict_btn", paste(icon("flask"), " Predict Soil Properties"))
-          showNotification(
-            paste("✅ Prediction completed successfully for", nrow(predictions), "samples!"),
-            type = "message",
-            duration = 5
-          )
+          showModal(modalDialog(
+            tags$style(".modal-content { background-color: #d4edda !important; border-color: #c3e6cb !important; }"),
+            div(
+              style = "text-align: center; padding: 10px;",
+              tags$h4(
+                style = "color: #1a6b3a; margin-bottom: 8px;",
+                "\u2705 Prediction Complete"
+              ),
+              p(
+                style = "color: #2d6a4f; margin-bottom: 5;",
+                paste("Successfully predicted soil properties for", nrow(predictions), "samples.")
+              )
+            ),
+            footer = modalButton("OK"),
+            easyClose = TRUE,
+            size = "l"
+          ))
         },
         error = function(e) {
           # Log detailed error information
@@ -1019,131 +1045,173 @@ prediction_server <- function(id) {
       }
     })
 
-    # Soil property density plots (native plotly - avoids ggplotly/geom_density bug)
-    output$prediction_plot <- renderPlotly({
+    # Desired display order for soil properties
+    .prop_order <- c(
+      "SOC_g_kg", "TN_g_kg", "pH", "CEC_cmolc_kg",
+      "ExCa_cmolc_kg", "ExMg_cmolc_kg", "ExK_cmolc_kg",
+      "Clay_%", "Sand_%", "Silt_%"
+    )
+
+    # Dynamic density plot grid — individual cards per property; Sand/Silt/Clay share one card
+    output$density_plots_ui <- renderUI({
       req(prediction_results())
       predictions <- prediction_results()
-
       soil_properties <- colnames(predictions)[-1]
-      if (length(soil_properties) == 0) return(NULL)
+      if (length(soil_properties) == 0) {
+        return(NULL)
+      }
 
-      # Desired display order
-      display_order <- c(
-        "SOC_g_kg", "TN_g_kg", "pH", "CEC_cmolc_kg",
-        "ExCa_cmolc_kg", "ExMg_cmolc_kg", "ExK_cmolc_kg",
-        "Clay_%", "Sand_%", "Silt_%"
-      )
-      ordered_props <- intersect(display_order, soil_properties)
+      ordered_props <- intersect(.prop_order, soil_properties)
       ordered_props <- c(ordered_props, setdiff(soil_properties, ordered_props))
 
+      texture_idx <- grep("Sand|Clay|Silt", ordered_props, ignore.case = TRUE)
+      non_texture_idx <- setdiff(seq_along(ordered_props), texture_idx)
+
+      # With texture present always use 4-wide cols so texture card fits at 8
+      has_texture <- length(texture_idx) > 0L
+      n_items <- length(non_texture_idx) + if (has_texture) 1L else 0L
+      col_width <- if (has_texture) 4L else if (n_items == 1L) 12L else if (n_items == 2L) 6L else 4L
+
+      item_cards <- vector("list", n_items)
+      item_widths <- integer(n_items)
+
+      for (j in seq_along(non_texture_idx)) {
+        i <- non_texture_idx[j]
+        item_cards[[j]] <- card(
+          height = "260px", full_screen = TRUE, class = "spectral-card",
+          card_header(ordered_props[i], class = "bg-gradient text-white py-1"),
+          card_body(
+            fill = TRUE, padding = 0,
+            plotlyOutput(session$ns(paste0("dens_plot_", i)), height = "100%")
+          )
+        )
+        item_widths[j] <- col_width
+      }
+
+      if (has_texture) {
+        tex_plots <- lapply(texture_idx, function(i) {
+          div(
+            div(
+              style = "text-align:center; font-size:0.8em; color:#6c757d; padding:2px 0;",
+              ordered_props[i]
+            ),
+            plotlyOutput(session$ns(paste0("dens_plot_", i)), height = "205px")
+          )
+        })
+        k <- n_items
+        item_cards[[k]] <- card(
+          height = "260px", full_screen = TRUE, class = "spectral-card",
+          card_header("Clay / Sand / Silt", class = "bg-gradient text-white py-1"),
+          card_body(
+            fill = TRUE, padding = "4px",
+            do.call(layout_columns, c(list(col_widths = rep(4L, length(texture_idx))), tex_plots))
+          )
+        )
+        item_widths[k] <- min(col_width * 2L, 12L)
+      }
+
+      do.call(layout_columns, c(list(col_widths = item_widths), item_cards))
+    })
+
+    # Register one renderPlotly per property whenever predictions update
+    observeEvent(prediction_results(), {
+      predictions <- prediction_results()
+      soil_properties <- colnames(predictions)[-1]
+      if (length(soil_properties) == 0) {
+        return()
+      }
+
+      ordered_props <- intersect(.prop_order, soil_properties)
+      ordered_props <- c(ordered_props, setdiff(soil_properties, ordered_props))
       texture_props <- grep("Sand|Clay|Silt", ordered_props, value = TRUE, ignore.case = TRUE)
-      vals <- selected_row_values()
-      ncols <- min(5L, length(ordered_props))
 
-      # Build one plotly panel per property
-      plots <- lapply(seq_along(ordered_props), function(i) {
-        prop <- ordered_props[i]
-        prop_vals <- suppressWarnings(as.numeric(predictions[[prop]]))
-        prop_vals <- prop_vals[!is.na(prop_vals) & prop_vals != -99]
-        is_first <- i == 1
-        is_left_col <- (i - 1L) %% ncols == 0L
+      for (i in seq_along(ordered_props)) {
+        local({
+          idx <- i
+          prop <- ordered_props[idx]
+          is_texture <- prop %in% texture_props
+          prop_vals <- suppressWarnings(as.numeric(predictions[[prop]]))
+          prop_vals <- prop_vals[!is.na(prop_vals) & prop_vals != -99]
 
-        # Title annotation - subplot() transforms xref/yref="paper" to each panel's domain
-        title_annot <- list(
-          text = paste0("<b>", prop, "</b>"),
-          x = 0.5, xref = "paper",
-          y = 1.0, yref = "paper",
-          xanchor = "center", yanchor = "bottom",
-          showarrow = FALSE,
-          font = list(size = 12, color = "black")
-        )
+          output[[paste0("dens_plot_", idx)]] <- renderPlotly({
+            x_range <- if (is_texture) list(range = c(0, 100)) else list()
+            vals <- selected_row_values()
+            sel_v <- if (!is.null(vals)) suppressWarnings(as.numeric(vals[[prop]])) else NA_real_
 
-        if (length(prop_vals) < 2) {
-          return(
-            plot_ly() |>
-              layout(
-                xaxis = list(title = "", color = "black", gridcolor = "#e0e0e0",
-                  tickfont = list(size = 10, color = "black")),
-                yaxis = list(title = "", color = "black", gridcolor = "#e0e0e0",
-                  showticklabels = is_left_col),
-                annotations = list(
-                  title_annot,
-                  list(text = "Insufficient data", x = 0.5, y = 0.5,
-                    xref = "paper", yref = "paper", showarrow = FALSE,
-                    font = list(color = "grey", size = 11))
-                )
+            if (length(prop_vals) < 2) {
+              return(
+                plot_ly() |>
+                  layout(
+                    xaxis = list(title = ""),
+                    yaxis = list(title = "Density"),
+                    annotations = list(list(
+                      text = "Insufficient data", x = 0.5, y = 0.5,
+                      xref = "paper", yref = "paper", showarrow = FALSE,
+                      font = list(color = "grey", size = 11)
+                    )),
+                    paper_bgcolor = "white", plot_bgcolor = "white"
+                  ) |>
+                  config(displayModeBar = FALSE)
               )
-          )
-        }
+            }
 
-        dens <- density(prop_vals)
-        mean_v <- mean(prop_vals)
-        med_v <- median(prop_vals)
-        max_y <- max(dens$y)
-        x_range <- if (prop %in% texture_props) list(range = c(0, 100)) else list()
+            dens <- density(prop_vals)
+            mean_v <- mean(prop_vals)
+            med_v <- median(prop_vals)
+            max_y <- max(dens$y)
 
-        p <- plot_ly() |>
-          add_trace(
-            x = dens$x, y = dens$y,
-            type = "scatter", mode = "lines",
-            fill = "tozeroy",
-            fillcolor = "rgba(70, 130, 180, 0.3)",
-            line = list(color = "steelblue", width = 1.5),
-            showlegend = FALSE, name = prop
-          ) |>
-          add_segments(
-            x = mean_v, xend = mean_v, y = 0, yend = max_y,
-            line = list(color = "red", dash = "dash", width = 1.5),
-            showlegend = is_first, name = "Mean", legendgroup = "Mean"
-          ) |>
-          add_segments(
-            x = med_v, xend = med_v, y = 0, yend = max_y,
-            line = list(color = "#00ff88", dash = "dot", width = 1.5),
-            showlegend = is_first, name = "Median", legendgroup = "Median"
-          )
+            p <- plot_ly() |>
+              add_trace(
+                x = dens$x, y = dens$y,
+                type = "scatter", mode = "lines",
+                fill = "tozeroy",
+                fillcolor = "rgba(70, 130, 180, 0.3)",
+                line = list(color = "steelblue", width = 1.5),
+                showlegend = FALSE, name = prop
+              ) |>
+              add_segments(
+                x = mean_v, xend = mean_v, y = 0, yend = max_y,
+                line = list(color = "red", dash = "dash", width = 1.5),
+                showlegend = TRUE, name = "Mean", legendgroup = "Mean"
+              ) |>
+              add_segments(
+                x = med_v, xend = med_v, y = 0, yend = max_y,
+                line = list(color = "#00ff88", dash = "dot", width = 1.5),
+                showlegend = TRUE, name = "Median", legendgroup = "Median"
+              )
 
-        if (!is.null(vals)) {
-          sel_v <- suppressWarnings(as.numeric(vals[[prop]]))
-          if (!is.na(sel_v) && sel_v != -99) {
-            p <- p |> add_segments(
-              x = sel_v, xend = sel_v, y = 0, yend = max_y,
-              line = list(color = "orange", width = 2),
-              showlegend = is_first, name = "Selected", legendgroup = "Selected"
-            )
-          }
-        }
+            if (!is.na(sel_v) && sel_v != -99) {
+              p <- p |> add_segments(
+                x = sel_v, xend = sel_v, y = 0, yend = max_y,
+                line = list(color = "orange", width = 2),
+                showlegend = TRUE, name = "Selected", legendgroup = "Selected"
+              )
+            }
 
-        p |> layout(
-          xaxis = c(list(
-            title = "", color = "black", gridcolor = "#e0e0e0",
-            tickfont = list(size = 10, color = "black"), tickangle = -45, nticks = 5
-          ), x_range),
-          yaxis = list(
-            title = if (is_left_col) "Density" else "",
-            color = "black", gridcolor = "#e0e0e0",
-            showticklabels = is_left_col,
-            tickfont = list(size = 9, color = "black"), nticks = 4
-          ),
-          annotations = list(title_annot)
-        )
-      })
-
-      nrows <- ceiling(length(ordered_props) / ncols)
-
-      subplot(plots, nrows = nrows, shareX = FALSE, shareY = FALSE, margin = 0.08) |>
-        layout(
-          paper_bgcolor = "white",
-          plot_bgcolor = "white",
-          margin = list(l = 50, r = 20, b = 80, t = 50),
-          legend = list(
-            orientation = "h",
-            x = 0.5, xanchor = "center",
-            y = -0.08,
-            font = list(color = "black", size = 14)
-          ),
-          showlegend = TRUE
-        ) |>
-        config(displayModeBar = FALSE)
+            p |>
+              layout(
+                xaxis = c(list(
+                  title = "", color = "black", gridcolor = "#e0e0e0",
+                  tickfont = list(size = 10, color = "black"), tickangle = -45, nticks = 5
+                ), x_range),
+                yaxis = list(
+                  title = "Density", color = "black", gridcolor = "#e0e0e0",
+                  tickfont = list(size = 9, color = "black"), nticks = 4
+                ),
+                paper_bgcolor = "white",
+                plot_bgcolor = "white",
+                margin = list(l = 45, r = 10, b = 50, t = 10),
+                legend = list(
+                  orientation = "h",
+                  x = 0.5, xanchor = "center", y = -0.15,
+                  font = list(color = "black", size = 11)
+                ),
+                showlegend = TRUE
+              ) |>
+              config(displayModeBar = FALSE)
+          })
+        })
+      }
     })
 
     # Helper function for property relationship scatter plots
