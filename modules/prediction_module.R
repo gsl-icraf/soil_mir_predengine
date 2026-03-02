@@ -1134,7 +1134,7 @@ prediction_server <- function(id) {
           prop_vals <- prop_vals[!is.na(prop_vals) & prop_vals != -99]
 
           output[[paste0("dens_plot_", idx)]] <- renderPlotly({
-            x_range <- if (is_texture) list(range = c(0, 100)) else list()
+            x_range <- if (is_texture) list(range = c(0, 100)) else list(rangemode = "nonnegative")
             vals <- selected_row_values()
             sel_v <- if (!is.null(vals)) suppressWarnings(as.numeric(vals[[prop]])) else NA_real_
 
@@ -1156,6 +1156,10 @@ prediction_server <- function(id) {
             }
 
             dens <- density(prop_vals)
+            if (min(dens$x) < 0) {
+              dens <- density(prop_vals, from = 0)
+            }
+
             mean_v <- mean(prop_vals)
             med_v <- median(prop_vals)
             max_y <- max(dens$y)
