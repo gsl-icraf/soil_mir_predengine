@@ -1522,8 +1522,8 @@ prediction_server <- function(id) {
           silt_val <- if (length(silt_col) > 0) as.numeric(vals[[silt_col[1]]]) else (100 - clay_val - sand_val)
 
           if (!is.na(clay_val) && !is.na(sand_val) && !is.na(silt_val)) {
-            highlight_a <- list(list(sand_val))
-            highlight_b <- list(list(clay_val))
+            highlight_a <- list(list(clay_val))
+            highlight_b <- list(list(sand_val))
             highlight_c <- list(list(silt_val))
             highlight_text <- list(list(paste0("<b>SELECTED: ", vals$SSN, "</b>")))
           }
@@ -1589,19 +1589,20 @@ prediction_server <- function(id) {
 
       # USDA texture class boundaries for plotly
       # Define boundaries for each class as separate traces
+      # USDA axes: a = Clay (top), b = Sand (bottom-left), c = Silt (bottom-right)
       usda_classes <- list(
-        list(name = "Clay", a = c(0, 45, 45, 0, 0), b = c(40, 40, 55, 100, 40), c = c(60, 15, 0, 0, 60)),
-        list(name = "Silty Clay", a = c(0, 0, 20, 20, 0), b = c(40, 60, 60, 40, 40), c = c(60, 40, 20, 40, 60)),
-        list(name = "Sandy Clay", a = c(45, 65, 65, 45, 45), b = c(35, 35, 55, 55, 35), c = c(20, 0, -20, 0, 20)),
-        list(name = "Clay Loam", a = c(20, 45, 52, 52, 20, 20), b = c(27, 27, 35, 40, 40, 27), c = c(53, 28, 13, 8, 40, 53)),
-        list(name = "Silty Clay Loam", a = c(0, 20, 20, 0, 0, 0), b = c(27, 27, 40, 40, 27, 27), c = c(73, 53, 40, 60, 73, 73)),
-        list(name = "Sandy Clay Loam", a = c(45, 52, 80, 80, 45, 45), b = c(20, 20, 27, 35, 35, 20), c = c(35, 28, -7, -15, 20, 35)),
-        list(name = "Loam", a = c(23, 52, 52, 43, 23, 23), b = c(7, 7, 20, 27, 27, 7), c = c(70, 41, 28, 30, 50, 70)),
-        list(name = "Silt Loam", a = c(0, 20, 50, 50, 0, 0), b = c(0, 0, 12, 27, 27, 0), c = c(100, 80, 38, 23, 73, 100)),
-        list(name = "Sandy Loam", a = c(43, 52, 85, 85, 43, 43), b = c(0, 7, 7, 15, 15, 0), c = c(57, 41, 8, 0, 42, 57)),
-        list(name = "Loamy Sand", a = c(70, 85, 90, 70, 70), b = c(0, 0, 15, 15, 0), c = c(30, 15, -5, 15, 30)),
-        list(name = "Sand", a = c(85, 90, 100, 85, 85), b = c(0, 0, 10, 10, 0), c = c(15, 10, -10, 5, 15)),
-        list(name = "Silt", a = c(0, 0, 20, 0, 0), b = c(0, 12, 12, 0, 0), c = c(100, 88, 68, 100, 100))
+        list(name = "Clay", a = c(40, 40, 55, 100, 40), b = c(0, 45, 45, 0, 0), c = c(60, 15, 0, 0, 60)),
+        list(name = "Silty Clay", a = c(40, 60, 60, 40, 40), b = c(0, 0, 20, 20, 0), c = c(60, 40, 20, 40, 60)),
+        list(name = "Sandy Clay", a = c(35, 35, 55, 55, 35), b = c(45, 65, 65, 45, 45), c = c(20, 0, -20, 0, 20)),
+        list(name = "Clay Loam", a = c(27, 27, 35, 40, 40, 27), b = c(20, 45, 52, 52, 20, 20), c = c(53, 28, 13, 8, 40, 53)),
+        list(name = "Silty Clay Loam", a = c(27, 27, 40, 40, 27, 27), b = c(0, 20, 20, 0, 0, 0), c = c(73, 53, 40, 60, 73, 73)),
+        list(name = "Sandy Clay Loam", a = c(20, 20, 27, 35, 35, 20), b = c(45, 52, 80, 80, 45, 45), c = c(35, 28, -7, -15, 20, 35)),
+        list(name = "Loam", a = c(7, 7, 20, 27, 27, 7), b = c(23, 52, 52, 43, 23, 23), c = c(70, 41, 28, 30, 50, 70)),
+        list(name = "Silt Loam", a = c(0, 0, 12, 27, 27, 0), b = c(0, 20, 50, 50, 0, 0), c = c(100, 80, 38, 23, 73, 100)),
+        list(name = "Sandy Loam", a = c(0, 7, 7, 15, 15, 0), b = c(43, 52, 85, 85, 43, 43), c = c(57, 41, 8, 0, 42, 57)),
+        list(name = "Loamy Sand", a = c(0, 0, 15, 15, 0), b = c(70, 85, 90, 70, 70), c = c(30, 15, -5, 15, 30)),
+        list(name = "Sand", a = c(0, 0, 10, 10, 0), b = c(85, 90, 100, 85, 85), c = c(15, 10, -10, 5, 15)),
+        list(name = "Silt", a = c(0, 12, 12, 0, 0), b = c(0, 0, 20, 0, 0), c = c(100, 88, 68, 100, 100))
       )
 
       # Create plotly ternary plot
@@ -1624,9 +1625,10 @@ prediction_server <- function(id) {
       }
 
       # Add class labels (positioned at centroids)
+      # Centroids: a = Clay, b = Sand, c = Silt
       class_labels <- data.frame(
-        a = c(92, 80, 55, 35, 10, 8, 25, 65, 55, 20, 8, 15),
-        b = c(5, 10, 8, 18, 15, 34, 34, 28, 42, 50, 50, 60),
+        a = c(5, 10, 8, 18, 15, 34, 34, 28, 42, 50, 50, 60),
+        b = c(92, 80, 55, 35, 10, 8, 25, 65, 55, 20, 8, 15),
         c = c(3, 10, 37, 47, 75, 58, 32, 7, 3, 30, 42, 25),
         label = c(
           "Sand", "Loamy Sand", "Sandy Loam", "Loam", "Silt Loam",
@@ -1652,8 +1654,8 @@ prediction_server <- function(id) {
         data = texture_data,
         type = "scatterternary",
         mode = "markers",
-        a = ~Sand,
-        b = ~Clay,
+        a = ~Clay,
+        b = ~Sand,
         c = ~Silt,
         text = ~ paste0(
           "<b>SSN: ", SSN, "</b><br>",
@@ -1693,13 +1695,13 @@ prediction_server <- function(id) {
         ternary = list(
           sum = 100,
           aaxis = list(
-            title = list(text = "Sand %", font = list(color = "white", size = 16)),
+            title = list(text = "Clay %", font = list(color = "white", size = 16)),
             tickfont = list(color = "white", size = 14),
             gridcolor = "rgba(128, 128, 128, 0.3)",
             linecolor = "white"
           ),
           baxis = list(
-            title = list(text = "Clay %", font = list(color = "white", size = 16)),
+            title = list(text = "Sand %", font = list(color = "white", size = 16)),
             tickfont = list(color = "white", size = 14),
             gridcolor = "rgba(128, 128, 128, 0.3)",
             linecolor = "white"

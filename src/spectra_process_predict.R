@@ -123,7 +123,7 @@ process_spectra_predict <- function(spectra_mir = spectral_df, target_wavelength
     ## Band selection on raw spectra (original column count)
     raw_headers <- as.numeric(colnames(spectra_mat))
     raw_band_sel <- raw_headers >= 601 & raw_headers <= 4001
-    spectra_mir_sel <- spectra_mat[, raw_band_sel]
+    spectra_mir_sel <- spectra_mat[, raw_band_sel, drop = FALSE]
 
     ## Resample raw to reference wavebands using natural splines (matches reference modeling)
     spectra_mir_sel_resampled <- resample(
