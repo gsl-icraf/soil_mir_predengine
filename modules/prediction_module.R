@@ -1748,33 +1748,44 @@ prediction_server <- function(id) {
     uploaded_pca_scores <- reactive({
       req(uploaded_spectra_df())
 
-      # Re-do preprocessing correctly to match src/spectra_process_predict.R
-      spectra_dt <- copy(uploaded_spectra_df())
-      ssn_labels <- spectra_dt$SSN
-      spectra_dt[, SSN := NULL]
+      tryCatch({
+        # Re-do preprocessing correctly to match src/spectra_process_predict.R
+        spectra_dt <- copy(uploaded_spectra_df())
+        ssn_labels <- spectra_dt$SSN
+        spectra_dt[, SSN := NULL]
 
-      mir_zscore <- scale(spectra_dt)
-      spectra_mir_sg <- data.table(savitzkyGolay(X = mir_zscore, p = 2, w = 11, m = 1))
+        # scale() produces NaN for a single sample (SD undefined); skip scaling
+        # in that case — predict.prcomp applies its own stored centering
+        spec_mat <- as.matrix(spectra_dt)
+        if (nrow(spec_mat) > 1) spec_mat <- scale(spec_mat)
+        spectra_mir_sg <- savitzkyGolay(X = spec_mat, p = 2, w = 11, m = 1)
 
-      # 3. Reference bands for resampling
-      wavebands_ref <- read.table(file.path("data", "wavebands.txt"), header = FALSE)
-      wavebands_ref <- as.numeric(wavebands_ref$V1)
+        # Reference bands for resampling
+        wavebands_ref <- read.table(file.path("data", "wavebands.txt"), header = FALSE)
+        wavebands_ref <- as.numeric(wavebands_ref$V1)
 
-      # Wavelength selection
-      headers_spectra <- as.numeric(colnames(spectra_dt))
-      band_sel <- headers_spectra >= 617 & headers_spectra <= 3991
-      spectra_mir_sel <- spectra_mir_sg[, ..band_sel]
+        # Wavelength selection (operate on SG output column names)
+        sg_wn <- as.numeric(colnames(spectra_mir_sg))
+        band_sel <- sg_wn >= 617 & sg_wn <= 3991
+        spectra_mir_sel <- spectra_mir_sg[, band_sel, drop = FALSE]
 
-      resampled_spectra <- resample(spectra_mir_sel, wav = colnames(spectra_mir_sel), new.wav = wavebands_ref)
-      colnames(resampled_spectra) <- paste0("w", wavebands_ref)
+        resampled_spectra <- resample(
+          spectra_mir_sel,
+          wav = colnames(spectra_mir_sel),
+          new.wav = wavebands_ref
+        )
+        colnames(resampled_spectra) <- paste0("w", wavebands_ref)
 
-      # 5. Project using PCA model
-      pca_res <- predict(pca_model(), resampled_spectra)
+        # Project using PCA model
+        pca_res <- predict(pca_model(), resampled_spectra)
 
-      # Return as data table with SSN
-      dt_scores <- as.data.table(pca_res)
-      dt_scores[, SSN := ssn_labels]
-      dt_scores
+        dt_scores <- as.data.table(pca_res)
+        dt_scores[, SSN := ssn_labels]
+        dt_scores
+      }, error = function(e) {
+        warning("PCA projection failed: ", conditionMessage(e))
+        NULL
+      })
     })
 
     # Identify PCA outliers (samples outside reference PCA space)
