@@ -359,7 +359,7 @@ prediction_server <- function(id) {
       s_list <- lapply(sample_spectra, function(f) {
         s_res <- suppressWarnings(read_opus(dsn = f))[[1]]
         raw_id <- s_res$basic_metadata$opus_sample_name
-        if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+        if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 4) {
           raw_id <- tools::file_path_sans_ext(basename(f))
         }
         spec_block <- s_res$ab_no_atm_comp %||% s_res$ab
@@ -737,9 +737,9 @@ prediction_server <- function(id) {
                 {
                   s <- all_spectra[[i]]
                   raw_id <- s$basic_metadata$opus_sample_name
-                  if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+                  if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 4) {
                     raw_id <- tools::file_path_sans_ext(basename(opus_files[i]))
-                    if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 8) {
+                    if (is.null(raw_id) || length(raw_id) == 0 || is.na(raw_id) || !grepl("^[A-Za-z]", as.character(raw_id)) || nchar(as.character(raw_id)) < 4) {
                       stop("INVALID_SAMPLE_ID_CRITICAL")
                     }
                   }
