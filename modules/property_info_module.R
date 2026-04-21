@@ -9,19 +9,20 @@ property_info_ui <- function(id) {
         .property-card {
           height: 100%;
           border-radius: 12px;
-          border: 1px solid rgba(0, 123, 255, 0.1);
-          transition: transform 0.2s ease-in-out;
-          background-color: white;
+          border: 1px solid rgba(0, 170, 255, 0.12);
+          background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,22,58,0.97) 100%);
+          transition: transform 0.2s ease-in-out, border-color 0.2s ease;
           display: flex;
           flex-direction: column;
         }
         .property-card:hover {
           transform: translateY(-5px);
-          box-shadow: 0 8px 15px rgba(0,0,0,0.08);
+          border-color: rgba(0, 229, 204, 0.22);
+          box-shadow: 0 8px 24px rgba(0, 60, 180, 0.22);
         }
         .card-header-clean {
-          background-color: #007bff !important;
-          border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+          background: linear-gradient(135deg, rgba(6,10,32,0.98) 0%, rgba(8,18,55,0.98) 50%, rgba(8,28,48,0.98) 100%) !important;
+          border-bottom: 1px solid rgba(0, 229, 204, 0.12) !important;
           color: white !important;
           font-weight: 700;
           padding: 1.25rem;
@@ -30,20 +31,20 @@ property_info_ui <- function(id) {
         }
         .unit-badge {
           font-size: 0.8rem;
-          background-color: #f8f9fa;
-          color: #495057;
+          background-color: rgba(0, 170, 255, 0.12);
+          color: rgba(140, 210, 255, 0.90);
           padding: 4px 12px;
           border-radius: 50px;
           margin-bottom: 15px;
           display: inline-block;
-          border: 1px solid #e9ecef;
+          border: 1px solid rgba(0, 170, 255, 0.20);
           font-weight: 600;
           letter-spacing: 0.5px;
         }
         .property-desc {
           font-size: 0.95rem;
-          color: white;
-          background-color: #2c3e50;
+          color: rgba(210, 225, 245, 0.90);
+          background-color: rgba(0, 30, 80, 0.40);
           padding: 15px;
           border-radius: 8px;
           line-height: 1.5;
@@ -51,22 +52,22 @@ property_info_ui <- function(id) {
           flex-grow: 1;
         }
         .range-section {
-          background-color: #fcfcfc;
+          background-color: rgba(0, 40, 100, 0.30);
           border-radius: 8px;
           padding: 12px;
-          border: 1px solid #f1f1f1;
+          border: 1px solid rgba(0, 170, 255, 0.10);
         }
         .range-label {
           font-weight: 700;
           font-size: 0.85rem;
-          color: #2d3748;
+          color: rgba(140, 200, 255, 0.80);
           text-transform: uppercase;
           letter-spacing: 0.5px;
           margin-bottom: 5px;
         }
         .range-value {
           font-size: 0.9rem;
-          color: #718096;
+          color: rgba(140, 170, 210, 0.70);
           font-style: italic;
         }
       "))
@@ -74,10 +75,10 @@ property_info_ui <- function(id) {
 
         # Hero Section
         div(
-            class = "py-5 text-center bg-white rounded-3 mb-5 shadow-sm",
-            style = "border: 1px solid #e9ecef;",
-            h1(class = "display-5 fw-bold text-dark", "Soil Properties Reference"),
-            p(class = "lead mb-0 text-muted", "A comprehensive guide to the soil indicators predicted by the specPred engine.")
+            class = "py-5 text-center rounded-3 mb-5",
+            style = "background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,28,55,0.97) 100%); border: 1px solid rgba(0,170,255,0.12);",
+            h1(class = "display-5 fw-bold", style = "color: #00e5cc;", "Soil Properties Reference"),
+            p(class = "lead mb-0", style = "color: rgba(140,170,210,0.70);", "A comprehensive guide to the soil indicators predicted by the specPred engine.")
         ),
 
         # Main Content Grid

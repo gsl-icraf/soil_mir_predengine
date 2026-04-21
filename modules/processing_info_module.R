@@ -9,16 +9,18 @@ processing_info_ui <- function(id) {
         .step-card {
           height: 100%;
           border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          transition: transform 0.2s ease-in-out;
-          background-color: #2d2d2d;
+          border: 1px solid rgba(0, 170, 255, 0.12);
+          background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,22,58,0.97) 100%);
+          transition: transform 0.2s ease-in-out, border-color 0.2s ease;
         }
         .step-card:hover {
           transform: translateY(-3px);
-          box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+          border-color: rgba(0, 229, 204, 0.22);
+          box-shadow: 0 8px 24px rgba(0, 60, 180, 0.22);
         }
         .step-header {
-          background-color: #1a1a2e !important;
+          background: linear-gradient(135deg, rgba(6,10,32,0.98) 0%, rgba(8,18,55,0.98) 50%, rgba(8,28,48,0.98) 100%) !important;
+          border-bottom: 1px solid rgba(0, 229, 204, 0.12) !important;
           color: white !important;
           font-weight: 700;
           padding: 1rem 1.25rem;
@@ -32,7 +34,7 @@ processing_info_ui <- function(id) {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background-color: #007bff;
+          background: linear-gradient(135deg, #0055ff 0%, #00aaff 100%);
           color: white;
           font-weight: 700;
           font-size: 0.95rem;
@@ -41,33 +43,33 @@ processing_info_ui <- function(id) {
         }
         .step-body {
           font-size: 1.05rem;
-          color: #e0e0e0;
+          color: rgba(210, 225, 245, 0.90);
           line-height: 1.7;
         }
         .step-body strong {
           color: #ffffff;
         }
         .step-body em {
-          color: #a0cfff;
+          color: #00e5cc;
         }
         .step-body li {
           margin-bottom: 6px;
         }
         .tech-badge {
           font-size: 0.85rem;
-          background-color: rgba(0, 123, 255, 0.15);
-          color: #a0cfff;
+          background-color: rgba(0, 170, 255, 0.12);
+          color: rgba(140, 210, 255, 0.90);
           padding: 4px 12px;
           border-radius: 50px;
           display: inline-block;
-          border: 1px solid rgba(0, 123, 255, 0.3);
+          border: 1px solid rgba(0, 170, 255, 0.20);
           font-weight: 600;
           margin: 3px;
         }
         .pipeline-arrow {
           text-align: center;
           font-size: 1.5rem;
-          color: #007bff;
+          color: #00e5cc;
           padding: 10px 0;
         }
       "))
@@ -76,9 +78,9 @@ processing_info_ui <- function(id) {
         # Hero Section
         div(
             class = "py-5 text-center rounded-3 mb-5",
-            style = "background-color: #1a1a2e; border: 1px solid rgba(255,255,255,0.1);",
-            h1(class = "display-5 fw-bold", style = "color: white;", "Spectral Processing Pipeline"),
-            p(class = "lead mb-0", style = "color: #b0b0b0; font-size: 1.2rem;",
+            style = "background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,28,55,0.97) 100%); border: 1px solid rgba(0,170,255,0.12);",
+            h1(class = "display-5 fw-bold", style = "color: #00e5cc;", "Spectral Processing Pipeline"),
+            p(class = "lead mb-0", style = "color: rgba(140,170,210,0.70); font-size: 1.2rem;",
               "How uploaded MIR spectra are processed and transformed into soil property predictions.")
         ),
 

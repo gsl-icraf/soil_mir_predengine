@@ -2,7 +2,13 @@
 home_ui <- function(id) {
   ns <- NS(id)
 
-  update_message <- "Fixed a bug in the scaling of uploaded spectra; updated models to use torch (Deep Neural Networks). This increases performance and accuracy. Added button to prediction page to reset session without downloading the results."
+  update_message <- paste(
+    "Enhanced metadata processing for OPUS files: improved SSN extraction",
+    "with broader instrument compatibility and better handling of short",
+    "sample IDs. UI updates including a USDA-correct soil texture triangle",
+    "(Clay on top), spectral landing page redesign, and fixes to",
+    "single-sample PCA projection."
+  )
 
   tagList(
     # Hero banner with glassmorphism effect

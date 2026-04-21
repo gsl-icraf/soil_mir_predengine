@@ -9,20 +9,27 @@ instructions_ui <- function(id) {
         .instruction-card {
           margin-bottom: 25px;
           border-radius: 12px;
-          border: 1px solid rgba(0, 123, 255, 0.1);
-          transition: transform 0.2s ease-in-out;
+          border: 1px solid rgba(0, 170, 255, 0.12);
+          background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,22,58,0.97) 100%);
+          color: rgba(210, 225, 245, 0.90);
+          transition: transform 0.2s ease-in-out, border-color 0.2s ease;
         }
         .instruction-card:hover {
           transform: translateY(-5px);
-          box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+          border-color: rgba(0, 229, 204, 0.22);
+          box-shadow: 0 8px 24px rgba(0, 60, 180, 0.22);
         }
+        .instruction-card .card-body { color: rgba(210, 225, 245, 0.90); }
+        .instruction-card p, .instruction-card h1, .instruction-card h2,
+        .instruction-card h3, .instruction-card h4, .instruction-card h5,
+        .instruction-card h6 { color: rgba(210, 225, 245, 0.90); }
         .instruction-icon {
           font-size: 2.5rem;
           margin-bottom: 15px;
-          color: #007bff;
+          color: #00e5cc;
         }
         .step-number {
-          background-color: #007bff;
+          background: linear-gradient(135deg, #0055ff 0%, #00aaff 100%);
           color: white;
           width: 30px;
           height: 30px;
@@ -38,13 +45,13 @@ instructions_ui <- function(id) {
 
         # Hero Section
         div(
-            class = "py-5 text-center bg-light rounded-3 mb-5",
-            style = "background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);",
-            h1(class = "display-5 fw-bold text-primary", "User Guide"),
-            p(class = "lead mb-4", "Mastering the CIFOR-ICRAF Spectral Prediction Engine"),
+            class = "py-5 text-center rounded-3 mb-5",
+            style = "background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,28,55,0.97) 100%); border: 1px solid rgba(0,170,255,0.12);",
+            h1(class = "display-5 fw-bold", style = "color: #00e5cc;", "User Guide"),
+            p(class = "lead mb-4", style = "color: rgba(210,225,245,0.90);", "Mastering the CIFOR-ICRAF Spectral Prediction Engine"),
             div(
                 class = "col-lg-6 mx-auto",
-                p(class = "text-muted", "Follow these simple steps to process your MIR spectra and generate soil property predictions.")
+                p(style = "color: rgba(140,170,210,0.70);", "Follow these simple steps to process your MIR spectra and generate soil property predictions.")
             )
         ),
 

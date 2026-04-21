@@ -27,7 +27,29 @@
   --umber: #635147;              /* Umber */
   --terra: #E2725B;              /* Terra cotta */
   --olive: #808000;              /* Olive */
-  
+
+  /* IR spectral palette (short → long wavenumber = violet → red) */
+  --spec-violet: #7c00ff;
+  --spec-cobalt: #0055ff;
+  --spec-sky:    #00aaff;
+  --spec-cyan:   #00e5cc;
+  --spec-green:  #00ff88;        /* matches app accent */
+  --spec-lime:   #88ff00;
+  --spec-amber:  #ffcc00;
+  --spec-orange: #ff6600;
+  --spec-ir:     #cc2200;
+
+  --spectral-gradient: linear-gradient(90deg,
+    var(--spec-violet) 0%,
+    var(--spec-cobalt) 14%,
+    var(--spec-sky)    28%,
+    var(--spec-cyan)   42%,
+    var(--spec-green)  57%,
+    var(--spec-lime)   71%,
+    var(--spec-amber)  85%,
+    var(--spec-ir)    100%
+  );
+
   /* Subtle earth gradients */
   --earth-gradient: linear-gradient(135deg, 
     rgba(139, 69, 19, 0.05) 0%,    /* Saddle brown */
@@ -177,7 +199,7 @@ body {
   }
 }
 
-/* Create overlay as a pseudo-element for petri dish */
+/* Animated IR spectral sweep overlay */
 .hero-banner::before {
   content: '';
   position: absolute;
@@ -185,104 +207,137 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, 
-    rgba(139, 0, 0, 0.12) 0%,      /* Subtle Dark Red overlay */
-    rgba(184, 134, 11, 0.08) 25%,   /* Golden overlay matching petri */
-    rgba(218, 165, 32, 0.05) 50%,   /* Goldenrod to match petri tones */
-    rgba(139, 69, 19, 0.06) 75%,    /* Saddle brown for warmth */
-    rgba(25, 25, 25, 0.3) 100%      /* Light dark background */
+  background: linear-gradient(90deg,
+    rgba(124,  0, 255, 0.22)  0%,
+    rgba(  0, 85, 255, 0.18) 14%,
+    rgba(  0,170, 255, 0.18) 28%,
+    rgba(  0,229, 204, 0.18) 42%,
+    rgba(  0,255, 136, 0.22) 57%,
+    rgba(136,255,   0, 0.14) 71%,
+    rgba(255,204,   0, 0.18) 85%,
+    rgba(204,  0,   0, 0.18) 100%
   );
+  background-size: 300% 100%;
+  animation: spectral-sweep 10s ease-in-out infinite;
   z-index: 1;
 }
 
-/* Glassmorphism overlay with golden petri tones */
+/* Scan-line: a glowing stripe that travels top→bottom like a spectrometer */
+.hero-banner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--spectral-gradient);
+  box-shadow:
+    0 0 8px  rgba(0, 255, 136, 0.9),
+    0 0 20px rgba(0, 170, 255, 0.6),
+    0 0 40px rgba(124, 0, 255, 0.3);
+  z-index: 4;
+  animation: scan-line 4s ease-in-out 1 forwards;
+}
+
+@keyframes spectral-sweep {
+  0%,  100% { background-position:   0% 50%; }
+  50%        { background-position: 100% 50%; }
+}
+
+@keyframes scan-line {
+  0%   { top: -2px;  opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.9; }
+  100% { top: 100%;  opacity: 0; }
+}
+
+/* Glassmorphism overlay — darkened base so spectral colours pop */
 .glass-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, 
-    rgba(139, 0, 0, 0.05) 0%,      /* Very subtle Dark Red */
-    rgba(184, 134, 11, 0.06) 30%,   /* Golden tone matching petri */
-    rgba(218, 165, 32, 0.04) 60%,   /* Goldenrod for warmth */
-    rgba(160, 82, 45, 0.08) 100%    /* Saddle brown for depth */
+  background: linear-gradient(135deg,
+    rgba(10, 5, 30, 0.45) 0%,
+    rgba(5, 15, 40, 0.35) 50%,
+    rgba(10, 5, 30, 0.45) 100%
   );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 2;
 }
 
-/* Glass card in banner with golden petri accents */
+/* Glass card — spectral-tinted */
 .glass-card {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.15) 0%,
-    rgba(184, 134, 11, 0.06) 25%,   /* Golden tone from petri */
-    rgba(218, 165, 32, 0.05) 50%,   /* Goldenrod accent */
-    rgba(139, 0, 0, 0.04) 75%,      /* Subtle dark red */
-    rgba(255, 255, 255, 0.05) 100%
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(0,  60, 180, 0.03)   40%,
+    rgba(0, 255, 136, 0.02)   70%,
+    rgba(255, 255, 255, 0.03) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: px solid rgba(255, 255, 255, 0.3);
-  border-top: 1px solid rgba(218, 165, 32, 0.3);
-  border-radius: 16px;
+  border: 0px solid rgba(200, 230, 255, 0.10);
+  border-top: 0px solid rgba(0, 255, 136, 0.15);
+  border-radius: 12px;
   padding: 3rem 2.5rem;
   text-align: center;
-  box-shadow: 
-    0 8px 32px rgba(184, 134, 11, 0.15),
-    0 4px 16px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow:
+    0 8px 32px  rgba(0,  40, 120, 0.05),
+    0 2px  8px  rgba(0,   0,   0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
   z-index: 3;
   max-width: 600px;
   margin: 0 1rem;
-  animation: float 6s ease-in-out infinite;
+  animation: float 10s ease-in-out infinite;
 }
 
-/* Banner content styling with earth theme */
+/* Banner title — IR spectral gradient text */
 .banner-title {
   font-size: 6rem;
   font-family: Roboto;
   font-weight: 700;
-  background: linear-gradient(90deg, 
-    var(--clay) 25%,
-    var(--rust) 50%,
-    var(--ochre) 75%,
-    var(--sage) 100%,
-    #212121 100%
-  );
+  background: var(--spectral-gradient);
+  background-size: 200% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 
-    2px 2px 4px rgba(139, 69, 19, 0.3),
-    0 0 15px rgba(160, 82, 45, 0.4);
   margin-bottom: 1rem;
   line-height: 1.2;
-  filter: drop-shadow(0 0 10px rgba(139, 69, 19, 0.3));
+  filter:
+    drop-shadow(0 0 12px rgba(0, 255, 136, 0.5))
+    drop-shadow(0 0 30px rgba(0, 170, 255, 0.3));
+  animation: title-shimmer 8s ease-in-out infinite;
+}
+
+@keyframes title-shimmer {
+  0%,  100% { background-position:   0% 50%; }
+  50%        { background-position: 100% 50%; }
 }
 
 .banner-subtitle {
   font-size: 1.25rem;
   font-family: Poppins;
-  color: rgba(0, 0, 0, 0.9);
+  color: rgba(220, 240, 255, 0.92);
   margin-bottom: 2rem;
   font-weight: 300;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 12px rgba(0, 170, 255, 0.4), 1px 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .banner-cta {
-  background: linear-gradient(135deg, 
-    var(--primary-color) 0%,
-    var(--rust) 50%,
-    var(--clay) 100%
+  background: linear-gradient(90deg,
+    var(--spec-cobalt)  0%,
+    var(--spec-cyan)   40%,
+    var(--spec-green)  60%,
+    var(--spec-amber) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  color: white;
+  background-size: 200% 100%;
+  border: 1px solid rgba(0, 229, 204, 0.5);
+  color: #0a0a0a;
   padding: 0.75rem 2rem;
   border-radius: 50px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1.1rem;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -291,44 +346,36 @@ body {
   display: inline-block;
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
-  box-shadow: 
-    0 4px 20px rgba(139, 69, 19, 0.3),
-    0 2px 10px rgba(160, 82, 45, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 4px 20px rgba(0, 255, 136, 0.35),
+    0 2px 10px rgba(0, 170, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: none;
   position: relative;
   overflow: hidden;
+  animation: cta-pulse 3s ease-in-out infinite;
 }
 
-.banner-cta::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: var(--earth-gradient-vibrant);
-  transition: left 0.5s ease;
-  z-index: -1;
+@keyframes cta-pulse {
+  0%,  100% { background-position:   0% 50%; box-shadow: 0 4px 20px rgba(0,255,136,0.35), 0 2px 10px rgba(0,170,255,0.25); }
+  50%        { background-position: 100% 50%; box-shadow: 0 4px 28px rgba(0,255,136,0.55), 0 2px 16px rgba(0,170,255,0.40); }
 }
 
 .banner-cta:hover {
   transform: translateY(-3px) scale(1.08);
-  background: linear-gradient(135deg, 
-    var(--rust) 0%,
-    var(--ochre) 50%,
-    var(--sage) 100%
+  background: linear-gradient(90deg,
+    var(--spec-violet) 0%,
+    var(--spec-sky)    33%,
+    var(--spec-green)  66%,
+    var(--spec-amber) 100%
   );
-  box-shadow: 
-    0 8px 35px rgba(139, 69, 19, 0.4),
-    0 4px 20px rgba(160, 82, 45, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-}
-
-.banner-cta:hover::before {
-  left: 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 35px rgba(0, 255, 136, 0.45),
+    0 4px 20px rgba(0, 170, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  animation: none;
 }
 
 /* Floating animation */
@@ -353,22 +400,20 @@ body {
   position: absolute;
   width: 3px;
   height: 3px;
-  background: radial-gradient(circle, 
-    var(--clay) 0%,
-    var(--rust) 30%,
-    var(--ochre) 60%,
+  background: radial-gradient(circle,
+    var(--spec-violet) 0%,
+    var(--spec-cobalt) 40%,
     transparent 100%
   );
   border-radius: 50%;
   animation: earth-drift 12s infinite linear;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .particle:nth-child(2n) {
-  background: radial-gradient(circle, 
-    var(--sage) 0%,
-    var(--moss) 30%,
-    var(--sand) 60%,
+  background: radial-gradient(circle,
+    var(--spec-cyan)  0%,
+    var(--spec-green) 40%,
     transparent 100%
   );
   animation-duration: 15s;
@@ -376,10 +421,9 @@ body {
 }
 
 .particle:nth-child(3n) {
-  background: radial-gradient(circle, 
-    var(--stone) 0%,
-    var(--umber) 30%,
-    var(--terra) 60%,
+  background: radial-gradient(circle,
+    var(--spec-amber)  0%,
+    var(--spec-orange) 40%,
     transparent 100%
   );
   animation-duration: 10s;
@@ -441,15 +485,18 @@ body {
 /* Spectral Cards Styling */
 /* =========================================================================== */
 
-/* Enhanced earth-themed cards */
+/* Dark navy spectral cards */
 .spectral-card {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.98) 0%,
-    rgba(250, 247, 240, 0.95) 100%
+  background: linear-gradient(135deg,
+    rgba(8,  14, 45, 0.97) 0%,
+    rgba(10, 22, 58, 0.97) 50%,
+    rgba(8,  18, 42, 0.97) 100%
   );
-  border: 1px solid rgba(139, 69, 19, 0.12);
+  border: 1px solid rgba(0, 170, 255, 0.12);
   border-radius: 16px;
-  box-shadow: var(--box-shadow-earth);
+  box-shadow:
+    0 4px 20px rgba(0, 40, 120, 0.20),
+    0 1px  4px rgba(0,  0,   0, 0.15);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
@@ -464,38 +511,33 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, 
-    var(--soil) 0%,
-    var(--rust) 16.67%,
-    var(--clay) 33.33%,
-    var(--ochre) 50%,
-    var(--sage) 66.67%,
-    var(--moss) 83.33%,
-    var(--sand) 100%
-  );
+  background: var(--spectral-gradient);
   opacity: 0;
   transition: opacity 0.4s ease;
 }
 
 .spectral-card:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 
-    0 12px 40px rgba(139, 69, 19, 0.15),
-    0 4px 12px rgba(160, 82, 45, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 229, 204, 0.22);
+  box-shadow:
+    0 12px 40px rgba(0,  60, 180, 0.22),
+    0  4px 12px rgba(0, 229, 204, 0.10),
+    0  1px  3px rgba(0,   0,   0, 0.12);
 }
 
 .spectral-card:hover::before {
   opacity: 1;
 }
 
-/* Earth-themed card headers */
+/* Spectral card headers — matches navbar */
 .spectral-card .card-header.bg-gradient {
-  background: linear-gradient(135deg, 
-    var(--primary-color) 0%,
-    var(--rust) 50%,
-    var(--clay) 100%
+  background: linear-gradient(135deg,
+    rgba(6,  10, 32, 0.98) 0%,
+    rgba(8,  18, 55, 0.98) 40%,
+    rgba(8,  28, 48, 0.98) 70%,
+    rgba(6,  16, 36, 0.98) 100%
   ) !important;
+  border-bottom: 1px solid rgba(0, 229, 204, 0.12);
   border: none;
   padding: 1rem 1.25rem;
   font-weight: 600;
@@ -529,6 +571,21 @@ body {
 .spectral-card .card-body {
   padding: 1.5rem;
   position: relative;
+  color: rgba(210, 225, 245, 0.90);
+}
+
+.spectral-card .card-body p,
+.spectral-card .card-body h1,
+.spectral-card .card-body h2,
+.spectral-card .card-body h3,
+.spectral-card .card-body h4,
+.spectral-card .card-body h5,
+.spectral-card .card-body h6 {
+  color: rgba(210, 225, 245, 0.90);
+}
+
+.spectral-card .card-body .text-muted {
+  color: rgba(140, 170, 210, 0.70) !important;
 }
 
 /* Badge styling for earth theme */
@@ -577,19 +634,19 @@ body {
 
 /* Navigation bar enhancements - Earth Theme */
 .navbar {
-  background: linear-gradient(135deg, 
-    rgba(139, 69, 19, 0.95) 0%,    /* Saddle brown */
-    rgba(160, 82, 45, 0.95) 25%,   /* Sienna */
-    rgba(205, 133, 63, 0.95) 50%,  /* Peru */
-    rgba(139, 69, 19, 0.95) 100%   /* Saddle brown */
+  background: linear-gradient(135deg,
+    rgba(8,  12, 40, 0.97) 0%,
+    rgba(10, 20, 60, 0.97) 40%,
+    rgba(8,  30, 50, 0.97) 70%,
+    rgba(6,  18, 38, 0.97) 100%
   ) !important;
-  box-shadow: 
-    0 4px 20px rgba(139, 69, 19, 0.2),
-    0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 4px 24px rgba(0, 40, 120, 0.25),
+    0 1px  0   rgba(0, 229, 204, 0.12);
   border: none;
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 229, 204, 0.12);
 }
 
 .navbar-brand {
@@ -627,10 +684,10 @@ body {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, 
-    rgba(139, 69, 19, 0.3) 0%,
-    rgba(205, 133, 63, 0.3) 50%,
-    rgba(154, 205, 50, 0.3) 100%
+  background: linear-gradient(90deg,
+    rgba(0,  85, 255, 0.20) 0%,
+    rgba(0, 229, 204, 0.20) 50%,
+    rgba(0, 255, 136, 0.20) 100%
   );
   transition: left 0.3s ease;
   z-index: -1;
@@ -639,7 +696,7 @@ body {
 .navbar-nav .nav-link:hover {
   color: white !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(139, 69, 19, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 170, 255, 0.20);
 }
 
 .navbar-nav .nav-link:hover::before {
@@ -648,14 +705,14 @@ body {
 
 .navbar-nav .nav-link.active {
   color: white !important;
-  background: linear-gradient(135deg, 
-    rgba(139, 69, 19, 0.4) 0%,
-    rgba(205, 133, 63, 0.4) 100%
+  background: linear-gradient(135deg,
+    rgba(0,  85, 255, 0.30) 0%,
+    rgba(0, 229, 204, 0.25) 100%
   );
   font-weight: 600;
-  box-shadow: 
-    0 2px 10px rgba(139, 69, 19, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 2px 10px rgba(0, 170, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* Router page transitions */
