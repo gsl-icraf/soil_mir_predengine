@@ -9,19 +9,17 @@ processing_info_ui <- function(id) {
         .step-card {
           height: 100%;
           border-radius: 12px;
-          border: 1px solid rgba(122, 82, 48, 0.14);
-          background: #ffffff;
-          transition: transform 0.2s ease-in-out, border-color 0.2s ease, box-shadow 0.2s ease;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          transition: transform 0.2s ease-in-out;
+          background-color: #2d2d2d;
         }
         .step-card:hover {
           transform: translateY(-3px);
-          border-color: rgba(122, 82, 48, 0.28);
-          box-shadow: 0 8px 24px rgba(60, 30, 10, 0.12);
+          box-shadow: 0 8px 15px rgba(0,0,0,0.3);
         }
         .step-header {
-          background: linear-gradient(135deg, #2A1E10 0%, #3A2818 50%, #2A1E10 100%) !important;
-          border-bottom: 1px solid rgba(193, 122, 58, 0.20) !important;
-          color: #F0E4D0 !important;
+          background-color: #1a1a2e !important;
+          color: white !important;
           font-weight: 700;
           padding: 1rem 1.25rem;
           font-size: 1.15rem;
@@ -34,7 +32,7 @@ processing_info_ui <- function(id) {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #7A5230 0%, #C17A3A 100%);
+          background-color: #007bff;
           color: white;
           font-weight: 700;
           font-size: 0.95rem;
@@ -43,33 +41,33 @@ processing_info_ui <- function(id) {
         }
         .step-body {
           font-size: 1.05rem;
-          color: #1C1208;
+          color: #e0e0e0;
           line-height: 1.7;
         }
         .step-body strong {
-          color: #2A1E10;
+          color: #ffffff;
         }
         .step-body em {
-          color: #7A5230;
+          color: #a0cfff;
         }
         .step-body li {
           margin-bottom: 6px;
         }
         .tech-badge {
           font-size: 0.85rem;
-          background-color: rgba(122, 82, 48, 0.08);
-          color: #5C3A1E;
+          background-color: rgba(0, 123, 255, 0.15);
+          color: #a0cfff;
           padding: 4px 12px;
           border-radius: 50px;
           display: inline-block;
-          border: 1px solid rgba(122, 82, 48, 0.22);
+          border: 1px solid rgba(0, 123, 255, 0.3);
           font-weight: 600;
           margin: 3px;
         }
         .pipeline-arrow {
           text-align: center;
           font-size: 1.5rem;
-          color: #C17A3A;
+          color: #007bff;
           padding: 10px 0;
         }
       "))
@@ -78,17 +76,17 @@ processing_info_ui <- function(id) {
         # Hero Section
         div(
             class = "py-5 text-center rounded-3 mb-5",
-            style = "background: linear-gradient(135deg, #2A1E10 0%, #3A2818 100%); border: 1px solid rgba(193,122,58,0.20);",
-            h1(class = "display-5 fw-bold", style = "color: #F0DEC0;", "Spectral Processing Pipeline"),
-            p(class = "lead mb-0", style = "color: rgba(217, 196, 154, 0.85); font-size: 1.2rem;",
+            style = "background-color: #1a1a2e; border: 1px solid rgba(255,255,255,0.1);",
+            h1(class = "display-5 fw-bold", style = "color: white;", "Spectral Processing Pipeline"),
+            p(class = "lead mb-0", style = "color: #b0b0b0; font-size: 1.2rem;",
               "How uploaded MIR spectra are processed and transformed into soil property predictions.")
         ),
 
         # Pipeline overview
         div(
             class = "mb-4 p-4 rounded-3",
-            style = "background-color: #FDFAF6; border: 1px solid rgba(122, 82, 48, 0.14); color: #1C1208; font-size: 1.1rem;",
-            h5(class = "fw-bold mb-3", style = "color: #2A1E10;", "Pipeline Overview"),
+            style = "background-color: #2d2d2d; border: 1px solid rgba(255,255,255,0.1); color: #e0e0e0; font-size: 1.1rem;",
+            h5(class = "fw-bold mb-3", style = "color: white;", "Pipeline Overview"),
             p("Uploaded Opus binary files pass through a series of spectral processing steps before being fed into deep neural network models. ",
               "Each step is designed to harmonize the input spectra with the reference spectral library used during model training.")
         ),
