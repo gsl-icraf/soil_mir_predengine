@@ -9,21 +9,21 @@ property_info_ui <- function(id) {
         .property-card {
           height: 100%;
           border-radius: 12px;
-          border: 1px solid rgba(0, 170, 255, 0.12);
-          background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,22,58,0.97) 100%);
-          transition: transform 0.2s ease-in-out, border-color 0.2s ease;
+          border: 1px solid rgba(122, 82, 48, 0.14);
+          background: #ffffff;
+          transition: transform 0.2s ease-in-out, border-color 0.2s ease, box-shadow 0.2s ease;
           display: flex;
           flex-direction: column;
         }
         .property-card:hover {
           transform: translateY(-5px);
-          border-color: rgba(0, 229, 204, 0.22);
-          box-shadow: 0 8px 24px rgba(0, 60, 180, 0.22);
+          border-color: rgba(122, 82, 48, 0.28);
+          box-shadow: 0 8px 24px rgba(60, 30, 10, 0.12);
         }
         .card-header-clean {
-          background: linear-gradient(135deg, rgba(6,10,32,0.98) 0%, rgba(8,18,55,0.98) 50%, rgba(8,28,48,0.98) 100%) !important;
-          border-bottom: 1px solid rgba(0, 229, 204, 0.12) !important;
-          color: white !important;
+          background: linear-gradient(135deg, #2A1E10 0%, #3A2818 50%, #2A1E10 100%) !important;
+          border-bottom: 1px solid rgba(193, 122, 58, 0.20) !important;
+          color: #F0E4D0 !important;
           font-weight: 700;
           padding: 1.25rem;
           font-size: 1.1rem;
@@ -31,20 +31,20 @@ property_info_ui <- function(id) {
         }
         .unit-badge {
           font-size: 0.8rem;
-          background-color: rgba(0, 170, 255, 0.12);
-          color: rgba(140, 210, 255, 0.90);
+          background-color: rgba(122, 82, 48, 0.08);
+          color: #5C3A1E;
           padding: 4px 12px;
           border-radius: 50px;
           margin-bottom: 15px;
           display: inline-block;
-          border: 1px solid rgba(0, 170, 255, 0.20);
+          border: 1px solid rgba(122, 82, 48, 0.22);
           font-weight: 600;
           letter-spacing: 0.5px;
         }
         .property-desc {
           font-size: 0.95rem;
-          color: rgba(210, 225, 245, 0.90);
-          background-color: rgba(0, 30, 80, 0.40);
+          color: #1C1208;
+          background-color: #FDFAF6;
           padding: 15px;
           border-radius: 8px;
           line-height: 1.5;
@@ -52,22 +52,22 @@ property_info_ui <- function(id) {
           flex-grow: 1;
         }
         .range-section {
-          background-color: rgba(0, 40, 100, 0.30);
+          background-color: rgba(122, 82, 48, 0.06);
           border-radius: 8px;
           padding: 12px;
-          border: 1px solid rgba(0, 170, 255, 0.10);
+          border: 1px solid rgba(122, 82, 48, 0.14);
         }
         .range-label {
           font-weight: 700;
           font-size: 0.85rem;
-          color: rgba(140, 200, 255, 0.80);
+          color: #7A5230;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           margin-bottom: 5px;
         }
         .range-value {
           font-size: 0.9rem;
-          color: rgba(140, 170, 210, 0.70);
+          color: #3A2818;
           font-style: italic;
         }
       "))
@@ -76,9 +76,9 @@ property_info_ui <- function(id) {
         # Hero Section
         div(
             class = "py-5 text-center rounded-3 mb-5",
-            style = "background: linear-gradient(135deg, rgba(8,14,45,0.97) 0%, rgba(10,28,55,0.97) 100%); border: 1px solid rgba(0,170,255,0.12);",
-            h1(class = "display-5 fw-bold", style = "color: #00e5cc;", "Soil Properties Reference"),
-            p(class = "lead mb-0", style = "color: rgba(140,170,210,0.70);", "A comprehensive guide to the soil indicators predicted by the specPred engine.")
+            style = "background: linear-gradient(135deg, #2A1E10 0%, #3A2818 100%); border: 1px solid rgba(193,122,58,0.20);",
+            h1(class = "display-5 fw-bold", style = "color: #F0DEC0;", "Soil Properties Reference"),
+            p(class = "lead mb-0", style = "color: rgba(217, 196, 154, 0.85);", "A comprehensive guide to the soil indicators predicted by the specPred engine.")
         ),
 
         # Main Content Grid

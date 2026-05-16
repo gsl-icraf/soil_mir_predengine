@@ -140,7 +140,7 @@ ui <- function(request) {
 
     # Navigation bar
     div(
-      class = "navbar navbar-expand-lg navbar-dark bg-primary mb-4",
+      class = "navbar navbar-expand-lg navbar-dark bg-primary mb-0",
       div(
         class = "container-fluid",
         # Brand

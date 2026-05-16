@@ -47,17 +47,6 @@ home_ui <- function(id) {
       )
     ),
 
-    # Latest updates banner
-    div(
-      class = "alert alert-info d-flex align-items-center mt-3 mb-3",
-      style = "background-color: rgba(25, 135, 84, 0.5); border-color: rgba(25, 135, 84, 0.4); color: white;",
-      icon("bullhorn", class = "me-2", style = "font-size: 1.5em; color: black;"),
-      span(
-        tags$strong("Latest model update: ", format(Sys.Date(), "%d/%m/%Y")),
-        style = "color: black;"
-      )
-    ),
-
     # Featured Update Card
     card(
       class = "spectral-card mb-4",
@@ -71,7 +60,7 @@ home_ui <- function(id) {
         class = "bg-gradient text-white"
       ),
       card_body(
-        p(update_message, class = "lead", style = "font-size: 1.1em; color: rgba(255,255,255,0.9);")
+        p(update_message, class = "lead", style = "font-size: 1.1em;")
       )
     ),
 
