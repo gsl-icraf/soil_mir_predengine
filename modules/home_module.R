@@ -2,7 +2,7 @@
 home_ui <- function(id) {
   ns <- NS(id)
 
-  update_message <- "Fixed a bug in the scaling of uploaded spectra; updated models to use torch (Deep Neural Networks). This increases performance and accuracy. Added button to prediction page to reset session without downloading the results."
+  update_message <- "Updated models with latest data and model architectures."
 
   tagList(
     # Hero banner with glassmorphism effect
@@ -47,34 +47,52 @@ home_ui <- function(id) {
       card(
         class = "spectral-card",
         card_header(
-          icon("microscope"), " Spectral Analysis",
+          icon("microscope"),
+          " Spectral Analysis",
           class = "bg-gradient text-white"
         ),
-        card_image(src = "images/soil_sample_load.jpg", alt = "Loading soil samples"),
+        card_image(
+          src = "images/soil_sample_load.jpg",
+          alt = "Loading soil samples"
+        ),
         card_body(
-          p("This is a web-based application for predicting soil properties from mid-infrared (MIR) spectra. Soil spectroscopy is a powerful tool for predicting soil properties from mid-infrared (MIR) spectra. This application uses MIR spectra to predict soil properties such as soil organic carbon (SOC), total nitrogen (TN), pH, and more.")
+          p(
+            "This is a web-based application for predicting soil properties from mid-infrared (MIR) spectra. Soil spectroscopy is a powerful tool for predicting soil properties from mid-infrared (MIR) spectra. This application uses MIR spectra to predict soil properties such as soil organic carbon (SOC), total nitrogen (TN), pH, and more."
+          )
         )
       ),
       card(
         class = "spectral-card",
         card_header(
-          icon("chart-line"), " Predictive Modeling",
+          icon("chart-line"),
+          " Predictive Modeling",
           class = "bg-gradient text-white"
         ),
-        card_image(src = "images/soil_in_hand.jpg", alt = "Holding soil sample"),
+        card_image(
+          src = "images/soil_in_hand.jpg",
+          alt = "Holding soil sample"
+        ),
         card_body(
-          p("Our predictive models are trained using soil samples collected in the field from different parts of the world, covering a wide range of ecosystems from agricultural to natural ecosystems, and different land use- and cover types.")
+          p(
+            "Our predictive models are trained using soil samples collected in the field from different parts of the world, covering a wide range of ecosystems from agricultural to natural ecosystems, and different land use- and cover types."
+          )
         )
       ),
       card(
         class = "spectral-card",
         card_header(
-          icon("check-circle"), " Rapid, non-destructive and reproducible!",
+          icon("check-circle"),
+          " Rapid, non-destructive and reproducible!",
           class = "bg-gradient text-white"
         ),
-        card_image(src = "images/spectra_3d.jpg", alt = "Soil spectral analysis is rapid and cost-effective"),
+        card_image(
+          src = "images/spectra_3d.jpg",
+          alt = "Soil spectral analysis is rapid and cost-effective"
+        ),
         card_body(
-          p("One of the benefits of MIR spectroscopy is that it is a non-destructive method, meaning that the same soil sample can be used for multiple analyses. This makes it possible to build large and diverse datasets for model training. It is also a fast and cost-effective method."),
+          p(
+            "One of the benefits of MIR spectroscopy is that it is a non-destructive method, meaning that the same soil sample can be used for multiple analyses. This makes it possible to build large and diverse datasets for model training. It is also a fast and cost-effective method."
+          ),
           div(
             class = "d-flex align-items-center mb-2",
             span(class = "badge bg-success me-2", "Online"),
@@ -82,7 +100,8 @@ home_ui <- function(id) {
           ),
           div(
             class = "small text-muted",
-            "Last updated: ", format(Sys.time(), "%H:%M:%S")
+            "Last updated: ",
+            format(Sys.time(), "%H:%M:%S")
           )
         )
       )
@@ -94,7 +113,8 @@ home_ui <- function(id) {
       card(
         class = "spectral-card",
         card_header(
-          icon("rocket"), " Getting Started",
+          icon("rocket"),
+          " Getting Started",
           class = "bg-gradient text-white"
         ),
         card_body(
@@ -113,7 +133,9 @@ home_ui <- function(id) {
                 ),
                 div(
                   h6("Dashboard Overview", class = "mb-1"),
-                  p("This dashboard is a tool for predicting soil properties from mid-infrared (MIR) spectra using machine learning models. The Prediction Engine was developed to facilitate rapid predictions of a range of soil properties based on state-of-the-art spectroscopy and machine learning techniques, and accurate prediction models.")
+                  p(
+                    "This dashboard is a tool for predicting soil properties from mid-infrared (MIR) spectra using machine learning models. The Prediction Engine was developed to facilitate rapid predictions of a range of soil properties based on state-of-the-art spectroscopy and machine learning techniques, and accurate prediction models."
+                  )
                 )
               )
             ),
@@ -130,7 +152,9 @@ home_ui <- function(id) {
                 ),
                 div(
                   h6("Prediction Engine", class = "mb-1"),
-                  p("The Prediction Engine module allows users to upload their own MIR spectral data (in CSV format) and obtain rapid predictions of various soil properties. Users can visualize the predicted results through interactive plots and download the predicted outputs for further analysis.")
+                  p(
+                    "The Prediction Engine module allows users to upload their own MIR spectral data (in CSV format) and obtain rapid predictions of various soil properties. Users can visualize the predicted results through interactive plots and download the predicted outputs for further analysis."
+                  )
                 )
               )
             )
@@ -158,7 +182,6 @@ home_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     # Server logic for home module
     # Add any reactive logic, observers, or outputs here
-
     # Example: You could add reactive values or observers
     # observe({
     #   # Module-specific server logic
