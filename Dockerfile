@@ -48,7 +48,6 @@ RUN Rscript -e "install.packages('opusreader2', repos = c('https://spectral-cock
 
 # User configuration
 RUN useradd -m pred_engine_user
-USER pred_engine_user
 
 # Port
 EXPOSE 3838
