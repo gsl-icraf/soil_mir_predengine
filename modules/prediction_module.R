@@ -12,6 +12,8 @@ prediction_ui <- function(id) {
         title = list(icon("wave-square"), "Spectral Data"),
         value = "data",
         card_body(
+          div(
+          class = "dark-glass-panel",
           layout_columns(
             col_widths = c(4, 8),
 
@@ -177,6 +179,7 @@ prediction_ui <- function(id) {
               )
             )
           )
+          )
         )
       ),
 
@@ -188,13 +191,13 @@ prediction_ui <- function(id) {
           # Tip! Card
           card(
             class = "spectral-card mb-3",
-            style = "background-color: rgba(0, 255, 136, 0.05); border: 1px dashed rgba(0, 255, 136, 0.3);",
+            style = "background-color: rgba(34, 139, 34, 0.08); border: 1px dashed rgba(34, 139, 34, 0.35);",
             card_body(
               div(
                 class = "d-flex align-items-center",
-                icon("lightbulb", class = "me-3", style = "color: #00ff88; font-size: 1.5em;"),
+                icon("lightbulb", class = "me-3", style = "color: #228B22; font-size: 1.5em;"),
                 div(
-                  h6("Tip!", class = "mb-1", style = "color: #00ff88;"),
+                  h6("Tip!", class = "mb-1", style = "color: #228B22;"),
                   p("Clicking on a row in the table will highlight that specific sample in the texture triangle and the distribution plots below.", class = "mb-0 small")
                 )
               )

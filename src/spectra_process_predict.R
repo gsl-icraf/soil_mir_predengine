@@ -95,14 +95,9 @@ predict_torch <- function(model_path, new_data) {
                 pred_unscaled <- pred_unscaled^2
             }
 
-            if (!is.null(saved$target_scale) && saved$target_scale != 1) {
-                pred_unscaled <- pred_unscaled / saved$target_scale
-            }
-
+            # Clamp to observed training range (bounded-range properties, e.g. pH)
             if (!is.null(saved$y_range)) {
-                pred_unscaled <- (pred_unscaled - 0.1) *
-                    (saved$y_range$max - saved$y_range$min) / 0.8 +
-                    saved$y_range$min
+                pred_unscaled <- pmin(pmax(pred_unscaled, saved$y_range$min), saved$y_range$max)
             }
         }
     })

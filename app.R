@@ -36,8 +36,12 @@ ui <- function(request) {
   fluidPage(
     theme = bs_theme(
       version = 5,
-      bootswatch = "flatly",
-      primary = "#007bff",
+      primary = "#4A2E1B",
+      secondary = "#7A5230",
+      success = "#2F6F3A",
+      warning = "#C07530",
+      danger = "#8C2D19",
+      info = "#2C6A7A",
       base_font = font_google("Poppins")
     ),
 
