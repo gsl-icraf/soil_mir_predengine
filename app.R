@@ -42,6 +42,7 @@ ui <- function(request) {
       warning = "#C07530",
       danger = "#8C2D19",
       info = "#2C6A7A",
+      font_scale = 1.1,
       base_font = font_google("Poppins")
     ),
 

@@ -264,7 +264,8 @@ function initializeRouterNavigation() {
 // Call router initialization when document is ready
 $(document).ready(function() {
   setTimeout(initializeRouterNavigation, 100);
-  initializeSpectralParticles();
+  // initializeSpectralParticles() disabled: decorative-only, and the
+  // container it targets (.spectral-particles) is now hidden via CSS.
 });
 
 // =========================================================================
@@ -330,30 +331,10 @@ function initializeSpectralParticles() {
 // =========================================================================
 
 $(document).ready(function() {
-  // Add tilt effect to glass card on mouse move
-  $('.glass-card').on('mousemove', function(e) {
-    const card = $(this);
-    const rect = this.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    
-    const rotateX = (y - centerY) / 10;
-    const rotateY = (centerX - x) / 10;
-    
-    card.css({
-      transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px)`
-    });
-  });
-  
-  $('.glass-card').on('mouseleave', function() {
-    $(this).css({
-      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px)'
-    });
-  });
-  
+  // Mouse-tracking 3D tilt on the hero glass card was removed: it read as
+  // gimmicky motion rather than a purposeful cue, working against a calmer,
+  // less busy feel.
+
   // Initialize scroll reveal for spectral cards
   initializeScrollReveal();
 });

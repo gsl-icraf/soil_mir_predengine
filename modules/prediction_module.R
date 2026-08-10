@@ -3,7 +3,7 @@ prediction_ui <- function(id) {
   ns <- NS(id)
 
   tagList(
-    h2("Prediction Engine", class = "mb-4"),
+    h2("Prediction Engine", class = "mb-4", style = "color: var(--primary-color);"),
     navset_card_tab(
       id = ns("prediction_tabs"),
 
