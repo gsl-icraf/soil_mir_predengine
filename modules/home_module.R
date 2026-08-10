@@ -163,7 +163,7 @@ home_ui <- function(id) {
           div(
             class = "text-center",
             p(
-              "Developed by CIFOR-ICRAF | © 2025 All rights reserved."
+              "Developed by CIFOR-ICRAF | © 2026 All rights reserved."
             ),
             img(
               src = "images/spacial_logo.png",
