@@ -1345,3 +1345,15 @@ body {
 .shiny-notification-content-progress {
   backdrop-filter: blur(3px) !important;
 }
+
+/* =========================================================================== */
+/* Prediction Results Table: keep long SSN values from desyncing DT's scrollX  */
+/* header/body column widths                                                   */
+/* =========================================================================== */
+table.dataTable td.ssn-col,
+table.dataTable th.ssn-col {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1471,10 +1471,24 @@ prediction_server <- function(id) {
           options = list(
             pageLength = 10,
             scrollX = TRUE,
+            autoWidth = TRUE,
             dom = "Bfrtip",
             buttons = c("copy", "csv", "excel"),
             columnDefs = list(
-              list(className = "dt-center", targets = "_all")
+              list(className = "dt-center", targets = "_all"),
+              list(
+                targets = 0,
+                width = "160px",
+                className = "dt-center ssn-col",
+                render = DT::JS(
+                  "function(data, type, row) {",
+                  "  if (type === 'display' && data != null && data.length > 18) {",
+                  "    return '<span title=\"' + data + '\">' + data.substr(0, 16) + '&hellip;</span>';",
+                  "  }",
+                  "  return data;",
+                  "}"
+                )
+              )
             )
           ),
           class = "table-striped table-hover",
